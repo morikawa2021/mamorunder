@@ -148,7 +148,8 @@ struct TaskEditView: View {
                         AlarmSettingView(
                             enabled: $viewModel.alarmEnabled,
                             dateTime: $viewModel.alarmDateTime,
-                            sound: $viewModel.alarmSound
+                            sound: $viewModel.alarmSound,
+                            defaultDateTime: viewModel.taskType == .task ? viewModel.deadline : viewModel.startDateTime
                         )
                     }
                     .listRowBackground(Color(.systemBackground))

@@ -11,6 +11,7 @@ struct AlarmSettingView: View {
     @Binding var enabled: Bool
     @Binding var dateTime: Date?
     @Binding var sound: String?
+    let defaultDateTime: Date?  // 期限設定の時刻（デフォルト値として使用）
     
     var body: some View {
         Group {
@@ -18,7 +19,7 @@ struct AlarmSettingView: View {
             
             if enabled {
                 DatePicker("アラーム時刻", selection: Binding(
-                    get: { dateTime ?? Date() },
+                    get: { dateTime ?? defaultDateTime ?? Date() },
                     set: { dateTime = $0 }
                 ), displayedComponents: [.date, .hourAndMinute])
                 
