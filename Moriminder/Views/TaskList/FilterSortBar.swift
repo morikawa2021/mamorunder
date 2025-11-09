@@ -15,15 +15,45 @@ enum FilterMode {
     case priority(Priority)
 }
 
-enum SortMode {
+enum SortMode: Equatable {
     case createdAtDesc
     case createdAtAsc
-    case priority
-    case deadline
-    case startDateTime
+    case priorityDesc  // 重要度（高い順）
+    case priorityAsc   // 重要度（低い順）
+    case deadlineAsc   // 期限（早い順）
+    case deadlineDesc  // 期限（遅い順）
+    case startDateTimeAsc   // 開始日時（早い順）
+    case startDateTimeDesc  // 開始日時（遅い順）
     case alarmDateTime
     case category
     case alphabetical
+    
+    var displayName: String {
+        switch self {
+        case .createdAtDesc:
+            return "登録日時（新しい順）"
+        case .createdAtAsc:
+            return "登録日時（古い順）"
+        case .priorityDesc:
+            return "重要度（高い順）"
+        case .priorityAsc:
+            return "重要度（低い順）"
+        case .deadlineAsc:
+            return "期限（早い順）"
+        case .deadlineDesc:
+            return "期限（遅い順）"
+        case .startDateTimeAsc:
+            return "開始日時（早い順）"
+        case .startDateTimeDesc:
+            return "開始日時（遅い順）"
+        case .alarmDateTime:
+            return "アラーム日時"
+        case .category:
+            return "カテゴリ"
+        case .alphabetical:
+            return "アルファベット順"
+        }
+    }
 }
 
 struct FilterSortBar: View {
@@ -51,23 +81,43 @@ struct FilterSortBar: View {
             
             // ソートボタン
             Menu {
-                Button("登録日時（新しい順）") {
-                    sortMode = .createdAtDesc
+                Menu("期限") {
+                    Button("早い順") {
+                        sortMode = .deadlineAsc
+                    }
+                    Button("遅い順") {
+                        sortMode = .deadlineDesc
+                    }
                 }
-                Button("登録日時（古い順）") {
-                    sortMode = .createdAtAsc
+                
+                Menu("重要度") {
+                    Button("高い順") {
+                        sortMode = .priorityDesc
+                    }
+                    Button("低い順") {
+                        sortMode = .priorityAsc
+                    }
                 }
-                Button("重要度") {
-                    sortMode = .priority
+                
+                Menu("開始日時") {
+                    Button("早い順") {
+                        sortMode = .startDateTimeAsc
+                    }
+                    Button("遅い順") {
+                        sortMode = .startDateTimeDesc
+                    }
                 }
-                Button("期限") {
-                    sortMode = .deadline
-                }
-                Button("開始日時") {
-                    sortMode = .startDateTime
+                
+                Menu("登録日時") {
+                    Button("新しい順") {
+                        sortMode = .createdAtDesc
+                    }
+                    Button("古い順") {
+                        sortMode = .createdAtAsc
+                    }
                 }
             } label: {
-                Label("ソート", systemImage: "arrow.up.arrow.down")
+                Label("ソート: \(sortMode.displayName)", systemImage: "arrow.up.arrow.down")
             }
         }
         .padding()

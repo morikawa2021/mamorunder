@@ -13,7 +13,7 @@ import Combine
 class TaskListViewModel: ObservableObject {
     @Published var tasks: [Task] = []
     @Published var filterMode: FilterMode = .all
-    @Published var sortMode: SortMode = .createdAtDesc
+    @Published var sortMode: SortMode = .deadlineAsc
     @Published var showAddTask = false
     @Published var taskToComplete: Task?
     @Published var taskToDelete: Task?

@@ -10,7 +10,7 @@ import SwiftUI
 struct TaskListView: View {
     @StateObject private var viewModel = TaskListViewModel()
     @State private var filterMode: FilterMode = .all
-    @State private var sortMode: SortMode = .createdAtDesc
+    @State private var sortMode: SortMode = .deadlineAsc
     
     var body: some View {
         NavigationView {

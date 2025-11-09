@@ -12,7 +12,7 @@ import CoreData
 class TaskListViewModel: ObservableObject {
     @Published var tasks: [Task] = []
     @Published var filterMode: FilterMode = .all
-    @Published var sortMode: SortMode = .createdAtDesc
+    @Published var sortMode: SortMode = .deadlineAsc
     @Published var showAddTask = false
     
     private let taskManager: TaskManager
