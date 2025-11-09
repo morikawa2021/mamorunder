@@ -184,6 +184,10 @@ class RepeatingTaskGenerator {
         case .yearly:
             return calendar.date(byAdding: .year, value: 1, to: date) ?? date
             
+        case .everyNHours:
+            guard let hourInterval = pattern.hourInterval else { return date }
+            return calendar.date(byAdding: .hour, value: hourInterval, to: date) ?? date
+            
         case .everyNDays:
             guard let interval = pattern.interval else { return date }
             return calendar.date(byAdding: .day, value: interval, to: date) ?? date

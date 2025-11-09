@@ -14,6 +14,7 @@ struct RepeatSettingView: View {
     
     @State private var selectedPatternType: RepeatType = .daily
     @State private var customInterval: Int = 1
+    @State private var customHourInterval: Int = 1  // N時間ごとのN
     @State private var selectedWeekday: Int = 1  // 1=日曜日
     @State private var selectedWeek: Int = 1     // 第1週
     @State private var customDays: Set<Int> = [] // 1=日曜日〜7=土曜日
@@ -29,6 +30,7 @@ struct RepeatSettingView: View {
                     Text("毎週").tag(RepeatType.weekly)
                     Text("毎月").tag(RepeatType.monthly)
                     Text("毎年").tag(RepeatType.yearly)
+                    Text("N時間ごと").tag(RepeatType.everyNHours)
                     Text("N日ごと").tag(RepeatType.everyNDays)
                     Text("毎月第N曜日").tag(RepeatType.nthWeekdayOfMonth)
                     Text("カスタム").tag(RepeatType.custom)
@@ -42,6 +44,12 @@ struct RepeatSettingView: View {
                 case .daily, .weekly, .monthly, .yearly:
                     // 基本パターンは追加設定不要
                     EmptyView()
+                    
+                case .everyNHours:
+                    Stepper("\(customHourInterval)時間ごと", value: $customHourInterval, in: 1...168)
+                        .onChange(of: customHourInterval) { _ in
+                            updatePattern()
+                        }
                     
                 case .everyNDays:
                     Stepper("\(customInterval)日ごと", value: $customInterval, in: 1...365)
@@ -126,6 +134,8 @@ struct RepeatSettingView: View {
         selectedPatternType = pattern.type
         
         switch pattern.type {
+        case .everyNHours:
+            customHourInterval = pattern.hourInterval ?? 1
         case .everyNDays:
             customInterval = pattern.interval ?? 1
         case .nthWeekdayOfMonth:
@@ -148,6 +158,8 @@ struct RepeatSettingView: View {
             pattern = RepeatPattern.monthly()
         case .yearly:
             pattern = RepeatPattern.yearly()
+        case .everyNHours:
+            pattern = RepeatPattern.everyNHours(customHourInterval)
         case .everyNDays:
             pattern = RepeatPattern.everyNDays(customInterval)
         case .nthWeekdayOfMonth:
