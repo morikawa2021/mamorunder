@@ -81,6 +81,12 @@ class CategoryManager {
         category.color = color
         try viewContext.save()
     }
+    
+    // カテゴリ名を更新
+    func updateCategoryName(_ category: Category, name: String) throws {
+        category.name = name
+        try viewContext.save()
+    }
 }
 
 // カテゴリの色定義
@@ -91,7 +97,7 @@ extension CategoryManager {
         "#34C759", // 緑
         "#FF9500", // オレンジ
         "#AF52DE", // 紫
-        "#FF2D55", // ピンク
+        "#FF69B4", // ピンク（より明るいピンクに変更）
         "#5AC8FA", // 水色
         "#FFCC00", // 黄
     ]

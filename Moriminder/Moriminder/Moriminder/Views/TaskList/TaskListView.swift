@@ -12,6 +12,7 @@ struct TaskListView: View {
     @StateObject private var viewModel = TaskListViewModel()
     @Environment(\.managedObjectContext) private var viewContext
     @State private var taskToSubdivide: Task?
+    @State private var showCategoryManagement = false
     
     var body: some View {
         NavigationView {
@@ -37,6 +38,11 @@ struct TaskListView: View {
                                 viewModel.taskToShowDetail = task
                             }
                         )
+                            .listRowBackground(
+                                task.isCompleted
+                                    ? Color.gray.opacity(0.1)
+                                    : Color.clear
+                            )
                             .swipeActions(edge: .trailing) {
                                 // 完了アクション
                                 Button {
@@ -68,6 +74,15 @@ struct TaskListView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 AppTitleToolbar()
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showCategoryManagement = true
+                    } label: {
+                        Image(systemName: "folder.fill")
+                            .foregroundColor(.blue)
+                    }
+                }
             }
             .sheet(isPresented: $viewModel.showAddTask, onDismiss: {
                 viewModel.loadTasks()
@@ -143,6 +158,9 @@ struct TaskListView: View {
             }
             .onChange(of: viewModel.sortMode) { _ in
                 viewModel.loadTasks()
+            }
+            .sheet(isPresented: $showCategoryManagement) {
+                CategoryManagementView(viewContext: viewContext)
             }
         }
     }

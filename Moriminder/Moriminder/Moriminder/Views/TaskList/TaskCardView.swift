@@ -26,8 +26,19 @@ struct TaskCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // タスク名
-            Text(task.title ?? "無題のタスク")
-                .font(.headline)
+            HStack(spacing: 8) {
+                // 完了チェックマーク
+                if task.isCompleted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.headline)
+                }
+                
+                Text(task.title ?? "無題のタスク")
+                    .font(.headline)
+                    .strikethrough(task.isCompleted)
+                    .foregroundColor(task.isCompleted ? .secondary : .primary)
+            }
             
             HStack {
                 // カテゴリ
@@ -108,6 +119,7 @@ struct TaskCardView: View {
             }
         }
         .padding()
+        .opacity(task.isCompleted ? 0.7 : 1.0)
         .contentShape(Rectangle())
         .onTapGesture {
             onTap?()
