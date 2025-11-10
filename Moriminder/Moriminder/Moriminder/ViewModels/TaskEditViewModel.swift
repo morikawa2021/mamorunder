@@ -172,8 +172,27 @@ class TaskEditViewModel: ObservableObject {
         
         // アラーム設定
         task.alarmEnabled = alarmEnabled
-        task.alarmDateTime = alarmDateTime
+        // alarmEnabledがtrueでalarmDateTimeがnilの場合、defaultDateTime（deadlineまたはstartDateTime）を設定
+        if alarmEnabled && alarmDateTime == nil {
+            let defaultDateTime = taskType == .task ? deadline : startDateTime
+            if let defaultDateTime = defaultDateTime {
+                task.alarmDateTime = defaultDateTime
+                print("⚠️ アラームが有効ですがalarmDateTimeがnilのため、defaultDateTimeを設定しました: \(defaultDateTime)")
+            } else {
+                // defaultDateTimeもnilの場合は現在時刻を設定
+                task.alarmDateTime = Date()
+                print("⚠️ アラームが有効ですがalarmDateTimeとdefaultDateTimeがnilのため、現在時刻を設定しました")
+            }
+        } else {
+            task.alarmDateTime = alarmDateTime
+        }
         task.alarmSound = alarmSound
+        
+        print("💾 タスク保存: \(title)")
+        print("  - alarmEnabled: \(alarmEnabled)")
+        print("  - alarmDateTime: \(alarmDateTime?.description ?? "nil")")
+        print("  - task.alarmEnabled: \(task.alarmEnabled)")
+        print("  - task.alarmDateTime: \(task.alarmDateTime?.description ?? "nil")")
         
         // リマインド設定
         task.reminderEnabled = reminderEnabled

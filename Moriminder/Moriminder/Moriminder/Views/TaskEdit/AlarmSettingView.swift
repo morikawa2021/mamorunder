@@ -27,6 +27,25 @@ struct AlarmSettingView: View {
             }
         }
         .environment(\.locale, Locale(identifier: "ja_JP"))
+        .onChange(of: enabled) { newValue in
+            // アラームを有効にしたとき、dateTimeがnilならdefaultDateTimeを設定
+            if newValue && dateTime == nil {
+                let newDateTime = defaultDateTime ?? Date()
+                print("🔔 AlarmSettingView: enabledが\(newValue)に変更されました")
+                print("  - dateTime: \(dateTime?.description ?? "nil")")
+                print("  - defaultDateTime: \(defaultDateTime?.description ?? "nil")")
+                print("  - 設定する値: \(newDateTime)")
+                dateTime = newDateTime
+            }
+        }
+        .onChange(of: defaultDateTime) { newValue in
+            // defaultDateTimeが変更されたとき、dateTimeがnilでenabledがtrueなら更新
+            if enabled && dateTime == nil, let newDateTime = newValue {
+                print("🔔 AlarmSettingView: defaultDateTimeが変更されました")
+                print("  - 新しいdefaultDateTime: \(newDateTime)")
+                dateTime = newDateTime
+            }
+        }
     }
 }
 

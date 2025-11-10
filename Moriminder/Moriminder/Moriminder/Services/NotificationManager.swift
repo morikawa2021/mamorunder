@@ -33,15 +33,26 @@ class NotificationManager {
     
     // アラーム通知のスケジュール
     func scheduleAlarm(for task: Task) async throws {
-        guard let alarmDateTime = task.alarmDateTime else { return }
+        print("🔔 アラームスケジュール開始: \(task.title ?? "無題")")
+        print("  - alarmEnabled: \(task.alarmEnabled)")
+        print("  - alarmDateTime: \(task.alarmDateTime?.description ?? "nil")")
+        print("  - task.id: \(task.id?.uuidString ?? "nil")")
+        
+        guard let alarmDateTime = task.alarmDateTime else {
+            print("❌ アラーム時刻が設定されていません")
+            return
+        }
+        
         guard alarmDateTime > Date() else {
-            print("警告: アラーム時刻が過去です: \(alarmDateTime)")
+            print("❌ 警告: アラーム時刻が過去です: \(alarmDateTime)")
             return
         }
         
         // 通知権限を確認
         let authorizationStatus = await checkAuthorizationStatus()
+        print("  - 通知権限状態: \(authorizationStatus.rawValue)")
         guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
+            print("❌ 通知権限が許可されていません")
             throw NotificationError.authorizationDenied
         }
         
@@ -73,13 +84,27 @@ class NotificationManager {
             repeats: false
         )
         
+        let identifier = "alarm_\(task.id?.uuidString ?? UUID().uuidString)"
         let request = UNNotificationRequest(
-            identifier: "alarm_\(task.id?.uuidString ?? UUID().uuidString)",
+            identifier: identifier,
             content: content,
             trigger: trigger
         )
         
+        print("  - 通知識別子: \(identifier)")
+        print("  - 通知予定時刻: \(alarmDateTime)")
+        
         try await center.add(request)
+        print("✅ アラーム通知スケジュール成功: \(task.title ?? "無題") at \(alarmDateTime)")
+        
+        // スケジュールされた通知を確認
+        let pendingRequests = await center.pendingNotificationRequests()
+        let scheduledAlarm = pendingRequests.first { $0.identifier == identifier }
+        if scheduledAlarm != nil {
+            print("✅ スケジュール確認: 通知が正常に登録されました")
+        } else {
+            print("⚠️ 警告: スケジュール確認: 通知が見つかりませんでした")
+        }
     }
     
     // リマインド通知のスケジュール
@@ -250,9 +275,24 @@ class NotificationManager {
         let pendingRequests = await center.pendingNotificationRequests()
         let settings = await center.notificationSettings()
         
+        print("📋 通知予定取得: 総数 \(pendingRequests.count)")
+        
         // 通知を種類別に分類
         let alarms = pendingRequests.filter { $0.identifier.hasPrefix("alarm_") }
         let reminders = pendingRequests.filter { $0.identifier.hasPrefix("reminder_") }
+        
+        print("  - アラーム通知: \(alarms.count)個")
+        print("  - リマインド通知: \(reminders.count)個")
+        
+        // アラーム通知の識別子をログ出力
+        for alarm in alarms {
+            print("  - アラーム識別子: \(alarm.identifier)")
+            print("    - タイトル: \(alarm.content.title)")
+            if let trigger = alarm.trigger as? UNCalendarNotificationTrigger,
+               let date = Calendar.current.date(from: trigger.dateComponents) {
+                print("    - 予定時刻: \(date)")
+            }
+        }
         
         // 通知の時刻を抽出してソート
         let alarmDates = alarms.compactMap { request -> Date? in
