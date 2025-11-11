@@ -131,56 +131,80 @@ class ReminderService {
         // 期限時刻（または開始日時）を基準にリマインドを設定する場合の処理
         let targetTime = task.deadline ?? task.startDateTime
         let shouldCalculateFromTarget = targetTime != nil && task.reminderStartTime == nil
-        
+
         if shouldCalculateFromTarget, let targetTime = targetTime {
-            // 期限時刻から逆算してリマインドを設定
+            // 期限時刻の前後でリマインドを設定
             var reminderTimes: [Date] = []
-            var accumulatedInterval: TimeInterval = 0
-            
+
             // リマインド終了時刻を取得（設定されている場合）
             let reminderEndTime = task.reminderEndTime
-            
-            // 期限時刻から逆算してリマインド時刻を計算
-            for i in 0..<actualMaxNotifications {
+
+            // 期限後の通知間隔を取得（overdueInterval）
+            let overdueInterval = getOverdueInterval(for: task)
+
+            // 通知枠を期限前と期限後で配分
+            // 期限前: 60%、期限後: 40%（本システムの目的を考慮）
+            let beforeCount = Int(Double(actualMaxNotifications) * 0.6)
+            let afterCount = actualMaxNotifications - beforeCount
+
+            // 1. 期限時刻より前の通知を計算
+            var accumulatedInterval: TimeInterval = 0
+            for i in 0..<beforeCount {
                 let intervalIndex = i % intervals.count
                 let intervalMinutes = intervals[intervalIndex]
                 accumulatedInterval += TimeInterval(intervalMinutes * 60)
-                
+
                 let reminderTime = targetTime.addingTimeInterval(-accumulatedInterval)
-                
-                // 期限時刻を超えないようにする（この条件は通常は常にtrueだが、念のため）
-                if reminderTime > targetTime {
-                    break
-                }
-                
-                // リマインド終了時刻を超えないようにする
-                if let reminderEndTime = reminderEndTime, reminderTime > reminderEndTime {
-                    break
-                }
-                
+
                 // 現在時刻より未来の時刻のみ追加
                 if reminderTime > Date() {
                     reminderTimes.append(reminderTime)
                 }
             }
-            
-            // 計算したリマインド時刻をスケジュール（期限時刻に近い順から）
-            for reminderTime in reminderTimes.reversed() {
+
+            // 2. 期限時刻より後の通知を計算（本システムの核心機能）
+            // reminderEndTimeが設定されている場合はその時刻まで、設定されていない場合は継続
+            if reminderEndTime == nil || reminderEndTime! > targetTime {
+                var overdueAccumulatedInterval: TimeInterval = 0
+                for _ in 0..<afterCount {
+                    overdueAccumulatedInterval += TimeInterval(overdueInterval * 60)
+                    let reminderTime = targetTime.addingTimeInterval(overdueAccumulatedInterval)
+
+                    // リマインド終了時刻を超えないようにする
+                    if let reminderEndTime = reminderEndTime, reminderTime > reminderEndTime {
+                        break
+                    }
+
+                    // 現在時刻より未来の時刻のみ追加
+                    if reminderTime > Date() {
+                        reminderTimes.append(reminderTime)
+                    }
+                }
+            }
+
+            // 時刻順にソート
+            reminderTimes.sort()
+
+            // 計算したリマインド時刻をスケジュール
+            for reminderTime in reminderTimes {
                 if !task.isCompleted {
                     do {
                         try await notificationManager.scheduleReminderNotification(
                             for: task,
                             at: reminderTime
                         )
-                        print("リマインド通知スケジュール成功: \(task.title ?? "無題") at \(reminderTime)")
+                        let timing = reminderTime < targetTime ? "期限前" : "期限後"
+                        print("リマインド通知スケジュール成功: \(task.title ?? "無題") at \(reminderTime) (\(timing))")
                     } catch {
                         print("リマインド通知スケジュールエラー: \(error.localizedDescription) (タスク: \(task.title ?? "無題"), 時刻: \(reminderTime))")
                     }
                 }
             }
-            
+
+            let beforeNotifications = reminderTimes.filter { $0 < targetTime }.count
+            let afterNotifications = reminderTimes.filter { $0 >= targetTime }.count
             let instanceInfo = isRepeatingInstance ? " (繰り返しインスタンス)" : ""
-            print("リマインドスケジュール完了: \(task.title ?? "無題")\(instanceInfo) - スケジュール数: \(reminderTimes.count)")
+            print("リマインドスケジュール完了: \(task.title ?? "無題")\(instanceInfo) - スケジュール数: \(reminderTimes.count) (期限前: \(beforeNotifications), 期限後: \(afterNotifications))")
         } else {
             // 従来のロジック（開始時刻から順に間隔を加算）
             var currentTime = startTime
@@ -325,6 +349,38 @@ class ReminderService {
         }
     }
     
+    // 期限後の通知間隔を取得
+    private func getOverdueInterval(for task: Task) -> Int {
+        guard let priorityString = task.priority,
+              let priority = Priority(rawValue: priorityString),
+              let taskTypeString = task.taskType,
+              let taskType = TaskType(rawValue: taskTypeString) else {
+            // デフォルト: 1時間間隔
+            return 60
+        }
+
+        switch (priority, taskType) {
+        case (.low, .task):
+            // 低重要度・タスク: 期限後も1日1回
+            return 1440
+        case (.medium, .task):
+            // 中重要度・タスク: 期限後は3時間間隔
+            return 180
+        case (.high, .task):
+            // 高重要度・タスク: 期限後は1時間間隔
+            return 60
+        case (.low, .schedule):
+            // 低重要度・スケジュール: 開始日時超過後30分間隔
+            return 30
+        case (.medium, .schedule):
+            // 中重要度・スケジュール: 開始日時超過後15分間隔
+            return 15
+        case (.high, .schedule):
+            // 高重要度・スケジュール: 開始日時超過後1分間隔
+            return 1
+        }
+    }
+
     // 段階的リマインド間隔の計算
     private func calculateStagedIntervals(
         startDateTime: Date,
