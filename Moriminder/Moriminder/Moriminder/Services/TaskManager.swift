@@ -69,8 +69,12 @@ class TaskManager {
         
         // 3. 通知スケジュール
         // 編集時は既存の通知をキャンセルしてから再スケジュール
-        let isEditing = task.createdAt != nil && task.id != nil
+        // Core Dataの isInserted プロパティを使用して、本当に新規作成なのか編集なのかを判定
+        // isInserted = false の場合、既存のタスクが更新されている（編集モード）
+        // isInserted = true の場合、新しいタスクが作成されている（新規作成モード）
+        let isEditing = !task.isInserted
         if isEditing {
+            print("📝 タスク編集モード: 既存の通知をキャンセルしてから再スケジュールします")
             await notificationManager.cancelNotifications(for: task)
         }
         
@@ -89,7 +93,7 @@ class TaskManager {
                 print("アラームスケジュールエラー: \(error)")
                 // 通知エラーは保存を妨げないが、ログに記録
             }
-        } else if isEditing {
+        } else if isEditing && !task.alarmEnabled {
             // 編集時にアラームが無効化された場合、既存のアラーム通知をキャンセル
             await notificationManager.cancelAlarmNotifications(for: task)
         }
@@ -102,7 +106,7 @@ class TaskManager {
                 print("リマインドスケジュールエラー: \(error)")
                 // 通知エラーは保存を妨げないが、ログに記録
             }
-        } else if isEditing {
+        } else if isEditing && !task.reminderEnabled {
             // 編集時にリマインドが無効化された場合、既存のリマインド通知をキャンセル
             await notificationManager.cancelReminderNotifications(for: task)
         }

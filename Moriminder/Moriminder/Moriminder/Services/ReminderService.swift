@@ -18,6 +18,17 @@ class ReminderService {
     // リマインドスケジュール（iOS通知64個制限に対応）
     func scheduleReminder(for task: Task) async throws {
         guard task.reminderEnabled else { return }
+        
+        // 現在の通知数を確認（iOS 64個制限への対応）
+        let currentNotificationCount = await notificationManager.getPendingNotifications().count
+        let availableSlots = 64 - currentNotificationCount
+        
+        if availableSlots <= 0 {
+            print("⚠️ 警告: 通知の制限（64個）に達しています。新しい通知をスケジュールできません。")
+            throw NotificationError.notificationLimitReached
+        }
+        
+        print("📊 通知状況: 現在 \(currentNotificationCount)/64個、残り \(availableSlots)個のスロット")
 
         let intervals = calculateReminderIntervals(for: task)
         
@@ -52,12 +63,33 @@ class ReminderService {
         }
         
         let endTime = task.reminderEndTime ?? task.deadline ?? task.startDateTime
+        
+        // 繰り返しタスクのインスタンスかどうかを判定
+        // parentTaskIdが設定されている場合は、繰り返しタスクのインスタンス
+        let isRepeatingInstance = task.parentTaskId != nil
 
         // 終了日時がない場合、無限に通知をスケジュールするため、より多くの通知をスケジュール
         // iOS の通知64個制限に対応するため、直近の通知のみをスケジュール
         // 重要度に応じて最大通知数を調整
+        // 繰り返しタスクのインスタンスの場合は、通知数を減らして他のタスクとのバランスを保つ
+        // 利用可能なスロット数を考慮して、最大通知数を調整
         let maxNotificationsPerTask: Int
-        if endTime == nil {
+        if isRepeatingInstance {
+            // 繰り返しタスクのインスタンスの場合: 通知数を減らす（他のインスタンスとのバランスを考慮）
+            if let priorityString = task.priority,
+               let priority = Priority(rawValue: priorityString) {
+                switch priority {
+                case .high:
+                    maxNotificationsPerTask = 5   // 高重要度: 最大5個（インスタンス）
+                case .medium:
+                    maxNotificationsPerTask = 3   // 中重要度: 最大3個（インスタンス）
+                case .low:
+                    maxNotificationsPerTask = 2   // 低重要度: 最大2個（インスタンス）
+                }
+            } else {
+                maxNotificationsPerTask = 2  // デフォルト（インスタンス）
+            }
+        } else if endTime == nil {
             // 終了日時がない場合: より多くの通知をスケジュール（64個制限内で可能な限り多く）
             // ただし、他のタスクとのバランスを考慮して、重要度に応じた上限を設定
             if let priorityString = task.priority,
@@ -89,6 +121,12 @@ class ReminderService {
                 maxNotificationsPerTask = 5  // デフォルト
             }
         }
+        
+        // 利用可能なスロット数を考慮して、実際にスケジュールする通知数を調整
+        let actualMaxNotifications = min(maxNotificationsPerTask, availableSlots)
+        if actualMaxNotifications < maxNotificationsPerTask {
+            print("⚠️ 通知数制限: 要求 \(maxNotificationsPerTask)個 → 実際 \(actualMaxNotifications)個（利用可能スロット: \(availableSlots)個）")
+        }
 
         // 期限時刻（または開始日時）を基準にリマインドを設定する場合の処理
         let targetTime = task.deadline ?? task.startDateTime
@@ -103,7 +141,7 @@ class ReminderService {
             let reminderEndTime = task.reminderEndTime
             
             // 期限時刻から逆算してリマインド時刻を計算
-            for i in 0..<maxNotificationsPerTask {
+            for i in 0..<actualMaxNotifications {
                 let intervalIndex = i % intervals.count
                 let intervalMinutes = intervals[intervalIndex]
                 accumulatedInterval += TimeInterval(intervalMinutes * 60)
@@ -141,14 +179,15 @@ class ReminderService {
                 }
             }
             
-            print("リマインドスケジュール完了: \(task.title ?? "無題") - スケジュール数: \(reminderTimes.count)")
+            let instanceInfo = isRepeatingInstance ? " (繰り返しインスタンス)" : ""
+            print("リマインドスケジュール完了: \(task.title ?? "無題")\(instanceInfo) - スケジュール数: \(reminderTimes.count)")
         } else {
             // 従来のロジック（開始時刻から順に間隔を加算）
             var currentTime = startTime
             var notificationCount = 0
 
             // 直近の通知をスケジュール
-            while notificationCount < maxNotificationsPerTask {
+            while notificationCount < actualMaxNotifications {
                 // タスクが完了していない場合のみ通知をスケジュール
                 if !task.isCompleted {
                     let interval = intervals[notificationCount % intervals.count]
@@ -182,7 +221,8 @@ class ReminderService {
                 notificationCount += 1
             }
             
-            print("リマインドスケジュール完了: \(task.title ?? "無題") - スケジュール数: \(notificationCount)")
+            let instanceInfo = isRepeatingInstance ? " (繰り返しインスタンス)" : ""
+            print("リマインドスケジュール完了: \(task.title ?? "無題")\(instanceInfo) - スケジュール数: \(notificationCount)")
         }
 
         // 注: 終了日時がない場合、通知が配信された後、次の通知を自動的にスケジュールする

@@ -170,12 +170,44 @@ class NotificationManager {
         guard let taskId = task.id?.uuidString else { return }
         
         // 全ての通知を取得してフィルタリング
+        // アラーム通知: "alarm_\(taskId)"
+        // リマインド通知: "reminder_\(taskId)_\(timestamp)"
+        // タスクIDで始まるプレフィックスでフィルタリングすることで、他のタスクの通知を誤ってキャンセルしないようにする
         let pendingRequests = await center.pendingNotificationRequests()
+        
+        // デバッグ: このタスクIDに関連する通知を探す
+        let alarmPrefix = "alarm_\(taskId)"
+        let reminderPrefix = "reminder_\(taskId)_"
+        
         let taskNotificationIds = pendingRequests
-            .filter { $0.identifier.contains(taskId) }
+            .filter { request in
+                // アラーム通知またはリマインド通知のいずれかで、かつこのタスクIDを含むもの
+                request.identifier.hasPrefix(alarmPrefix) ||
+                request.identifier.hasPrefix(reminderPrefix)
+            }
             .map { $0.identifier }
         
+        if !taskNotificationIds.isEmpty {
+            print("🗑️ タスクの通知をキャンセル: \(task.title ?? "無題") (ID: \(taskId)) - \(taskNotificationIds.count)個の通知を削除")
+            print("   - 削除する通知識別子: \(taskNotificationIds.prefix(5).joined(separator: ", "))\(taskNotificationIds.count > 5 ? "..." : "")")
         center.removePendingNotificationRequests(withIdentifiers: taskNotificationIds)
+        } else {
+            // デバッグ: なぜ通知が見つからないのかを調査
+            print("ℹ️ キャンセルする通知がありません: \(task.title ?? "無題") (ID: \(taskId))")
+            print("   - 検索プレフィックス: alarm_\(taskId), reminder_\(taskId)_")
+            print("   - 現在の通知総数: \(pendingRequests.count)個")
+            
+            // このタスクIDに関連する通知があるか確認（部分一致でも）
+            let relatedNotifications = pendingRequests.filter { $0.identifier.contains(taskId) }
+            if !relatedNotifications.isEmpty {
+                print("   - 部分一致で見つかった通知: \(relatedNotifications.count)個")
+                for notification in relatedNotifications.prefix(3) {
+                    print("     * \(notification.identifier)")
+                }
+            } else {
+                print("   - このタスクIDに関連する通知は見つかりませんでした")
+            }
+        }
     }
     
     // アラーム通知のみをキャンセル
@@ -202,6 +234,7 @@ class NotificationManager {
             .map { $0.identifier }
         
         if !reminderNotificationIds.isEmpty {
+            print("🗑️ リマインド通知をキャンセル: \(task.title ?? "無題") - \(reminderNotificationIds.count)個の通知を削除")
             center.removePendingNotificationRequests(withIdentifiers: reminderNotificationIds)
         }
     }
