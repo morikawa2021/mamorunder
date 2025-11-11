@@ -246,8 +246,21 @@ class NotificationManager {
         // 通知が配信された後にユーザーが「スヌーズ」ボタンを押した時に適用される
         let snoozeCount = Int(task.snoozeCount)
         let snoozeMaxCount = Int(task.snoozeMaxCount)
-        
-        guard snoozeCount < snoozeMaxCount || task.snoozeUnlimited else {
+
+        // 期限超過チェック（仕様: 期限超過アイテムに対しては無期限スヌーズを適用）
+        let isOverdue: Bool
+        if let deadline = task.deadline {
+            isOverdue = deadline < Date()
+        } else if let startDateTime = task.startDateTime {
+            isOverdue = startDateTime < Date()
+        } else {
+            isOverdue = false
+        }
+
+        // 期限超過の場合は自動的に無制限スヌーズ
+        let effectiveSnoozeUnlimited = task.snoozeUnlimited || isOverdue
+
+        guard snoozeCount < snoozeMaxCount || effectiveSnoozeUnlimited else {
             throw NotificationError.maxSnoozeReached
         }
         

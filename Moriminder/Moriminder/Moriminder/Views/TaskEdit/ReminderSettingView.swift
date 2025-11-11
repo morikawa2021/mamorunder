@@ -83,23 +83,35 @@ struct ReminderSettingView: View {
                 
                 // スヌーズ設定
                 VStack(alignment: .leading, spacing: 8) {
-                    Toggle("無期限スヌーズ", isOn: $snoozeUnlimited)
-                        .onChange(of: snoozeUnlimited) { newValue in
-                            if newValue {
-                                // 無期限がONの場合、スヌーズ最大回数は無視される
-                            }
+                    // 期限超過判定
+                    let isOverdue: Bool = {
+                        if let deadline = deadline {
+                            return deadline < Date()
+                        } else if let startDateTime = startDateTime {
+                            return startDateTime < Date()
+                        } else {
+                            return false
                         }
-                    
-                    if !snoozeUnlimited {
-                        Stepper("スヌーズ最大回数: \(snoozeMaxCount)回", value: $snoozeMaxCount, in: 1...10)
-                    } else {
-                        HStack {
-                            Text("スヌーズ最大回数:")
-                            Spacer()
-                            Text("無期限")
+                    }()
+
+                    if isOverdue {
+                        // 期限超過時は読み取り専用表示
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("スヌーズ最大回数:")
+                                Spacer()
+                                Text("無制限")
+                                    .foregroundColor(.secondary)
+                            }
+                            .font(.subheadline)
+
+                            Text("ℹ️ 期限超過のため制限なし")
+                                .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        .font(.subheadline)
+                    } else {
+                        // 期限前は通常のStepper
+                        Stepper("スヌーズ最大回数: \(snoozeMaxCount)回", value: $snoozeMaxCount, in: 1...10)
                     }
                 }
                 
