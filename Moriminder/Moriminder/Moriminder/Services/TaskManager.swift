@@ -111,14 +111,22 @@ class TaskManager {
             await notificationManager.cancelReminderNotifications(for: task)
         }
         
-        // 4. 繰り返しタスクの場合は次回インスタンスを生成
-        // parentTaskIdが設定されている場合は、既に生成されたインスタンスなのでスキップ
+        // 4. 繰り返しタスクの場合の処理
+        // parentTaskIdが設定されている場合は、既に生成された子インスタンスなのでスキップ
         if task.isRepeating && task.parentTaskId == nil {
             do {
-                try await repeatingTaskGenerator.initializeRepeatingTask(for: task)
+                if isEditing {
+                    // 編集時: 未完了の子タスクを削除して新しい設定で再生成
+                    print("📝 繰り返しタスク編集: 未完了の子タスクを再生成します")
+                    try await repeatingTaskGenerator.updateRepeatingTaskInstances(for: task)
+                } else {
+                    // 新規作成時: 初回の子タスクを生成
+                    print("✨ 繰り返しタスク新規作成: 初回の子タスクを生成します")
+                    try await repeatingTaskGenerator.initializeRepeatingTask(for: task)
+                }
             } catch {
-                print("繰り返しタスク生成エラー: \(error)")
-                // 繰り返しタスク生成エラーは保存を妨げないが、ログに記録
+                print("繰り返しタスク処理エラー: \(error)")
+                // 繰り返しタスク処理エラーは保存を妨げないが、ログに記録
             }
         }
     }

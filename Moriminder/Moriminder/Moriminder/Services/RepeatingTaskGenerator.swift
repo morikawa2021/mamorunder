@@ -100,13 +100,49 @@ class RepeatingTaskGenerator {
             NSSortDescriptor(key: "deadline", ascending: true),
             NSSortDescriptor(key: "startDateTime", ascending: true)
         ]
-        
+
         do {
             return try viewContext.fetch(request)
         } catch {
             print("繰り返しインスタンス取得エラー: \(error)")
             return []
         }
+    }
+
+    // 親タスク編集時: 未完了の子タスクを削除して再生成
+    func updateRepeatingTaskInstances(for parentTask: Task) async throws {
+        guard parentTask.isRepeating else { return }
+
+        // 1. 未完了の子タスクを全て削除
+        try await deleteUncompletedInstances(for: parentTask)
+
+        // 2. 新しい設定で子タスクを再生成
+        try await initializeRepeatingTask(for: parentTask)
+    }
+
+    // 未完了の子タスクを削除
+    private func deleteUncompletedInstances(for parentTask: Task) async throws {
+        let parentId = parentTask.id
+        guard let parentId = parentId else { return }
+
+        // 未完了の子タスクを取得
+        let uncompletedTasks = fetchPendingRepeatingInstances(parentTaskId: parentId)
+
+        // 各タスクの通知をキャンセルして削除
+        for task in uncompletedTasks {
+            // 通知をキャンセル
+            await notificationManager.cancelNotifications(for: task)
+
+            // タスクを削除
+            viewContext.delete(task)
+        }
+
+        // 変更を保存
+        if viewContext.hasChanges {
+            try viewContext.save()
+        }
+
+        print("📝 親タスク編集: \(uncompletedTasks.count)個の未完了子タスクを削除しました")
     }
     
     // タスクインスタンスの作成
