@@ -76,11 +76,13 @@ class NotificationManager {
         }
         
         // スケジュール
+        var components = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute],
+            from: alarmDateTime
+        )
+        components.timeZone = TimeZone(identifier: "Asia/Tokyo")
         let trigger = UNCalendarNotificationTrigger(
-            dateMatching: Calendar.current.dateComponents(
-                [.year, .month, .day, .hour, .minute],
-                from: alarmDateTime
-            ),
+            dateMatching: components,
             repeats: false
         )
         
@@ -148,11 +150,13 @@ class NotificationManager {
         }
         
         // スケジュール
+        var components = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute],
+            from: date
+        )
+        components.timeZone = TimeZone(identifier: "Asia/Tokyo")
         let trigger = UNCalendarNotificationTrigger(
-            dateMatching: Calendar.current.dateComponents(
-                [.year, .month, .day, .hour, .minute],
-                from: date
-            ),
+            dateMatching: components,
             repeats: false
         )
         

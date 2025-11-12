@@ -88,6 +88,7 @@ struct ReminderSettingView: View {
                 }
             }
         }
+        .environment(\.locale, Locale(identifier: "ja_JP"))
         .onAppear {
             // 既存の終了時刻が設定されている場合、ピッカーを表示
             if endTime != nil {
