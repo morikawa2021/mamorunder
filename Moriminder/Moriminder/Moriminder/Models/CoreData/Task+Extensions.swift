@@ -42,9 +42,6 @@ extension Task {
         alarmEnabled = false
         reminderEnabled = false
         reminderInterval = 60
-        snoozeMaxCount = 5
-        snoozeUnlimited = false
-        snoozeCount = 0
         isRepeating = false
         isCompleted = false
         isArchived = false

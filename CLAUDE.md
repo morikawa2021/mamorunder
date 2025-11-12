@@ -56,7 +56,6 @@ Persistence Layer (Core Data / SwiftData)
 - Date settings: `taskType` (task/schedule), `deadline`, `startDateTime`
 - Notifications: `alarmDateTime`, `alarmSound`, `alarmEnabled`
 - Reminders: `reminderEnabled`, `reminderInterval`, `reminderStartTime`, `reminderEndTime`
-- Snooze: `snoozeMaxCount` (default 5, max 10), `snoozeUnlimited`, `snoozeCount`
 - Repeating: `isRepeating`, `repeatPattern`, `repeatEndDate`, `parentTaskId`
 - State: `isCompleted`, `isArchived`
 
@@ -92,24 +91,19 @@ Priority-based default settings with minute-level intervals:
 - High priority example: Weekly → Daily → 6hr → 3hr → 1hr → 30min → 15min → 5min → 1min intervals
 - Continues after start time if not completed
 
-### 3. Snooze Controls
-- Easy to snooze (one tap)
-- Limited snooze count (default 5, max 10, unlimited for overdue)
-- Completion/stopping requires confirmation dialogs (harder to dismiss)
-
-### 4. Natural Language Parsing
+### 3. Natural Language Parsing
 - Automatically extract date/time from task titles
 - Example: "明日の午後3時に会議" → Auto-set start time
 - Example: "来週の月曜日までに提出" → Auto-set deadline
 - Voice input support via Siri Shortcuts
 
-### 5. Task Subdivision (LLM Integration)
+### 4. Task Subdivision (LLM Integration)
 - Triggered after 1 week of incomplete tasks
 - Calls LLM API to suggest breaking tasks into 3-5 subtasks
 - User can approve, modify, or reject suggestions
 - Requires network connection (OpenAI API or similar)
 
-### 6. Recurring Tasks
+### 5. Recurring Tasks
 - Patterns: daily, weekly, monthly, yearly, custom, nth weekday of month, every N days
 - Each instance managed independently
 - Inherits reminder settings from parent
@@ -121,7 +115,6 @@ Priority-based default settings with minute-level intervals:
 - **REMINDER**: Repeated notifications at set intervals
 
 ### Notification Actions
-- **Snooze**: Easy access (one tap, no confirmation)
 - **Complete**: Requires confirmation dialog
 - **Stop**: Requires confirmation dialog
 - **Open**: Opens app to task detail
@@ -199,7 +192,7 @@ Priority-based default settings with minute-level intervals:
 
 **Integration tests for:**
 - Complete task registration flow
-- Reminder notification flow with snooze
+- Reminder notification flow
 - Task subdivision flow
 
 **UI tests for:**
@@ -262,6 +255,6 @@ Moriminder/
 ## Important Notes
 
 - This app is designed for **Japanese users** - UI text and natural language parsing must support Japanese
-- The app philosophy is to make it **easy to snooze but hard to complete/dismiss** - maintain this UX principle
+- The app philosophy is to make notifications **harder to ignore** through continuous reminders - maintain this UX principle
 - Always consider the **cognitive load** on users - provide defaults, presets, and smart suggestions
 - The staged reminder system for schedules is complex - test thoroughly with various time ranges

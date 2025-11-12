@@ -29,8 +29,6 @@ class TaskEditViewModel: ObservableObject {
     @Published var reminderInterval: Int = 60
     @Published var reminderStartTime: Date?
     @Published var reminderEndTime: Date?
-    @Published var snoozeMaxCount: Int = 5
-    @Published var snoozeUnlimited: Bool = false
     @Published var isRepeating: Bool = false
     @Published var repeatPattern: RepeatPattern?
     @Published var repeatEndDate: Date?
@@ -87,8 +85,6 @@ class TaskEditViewModel: ObservableObject {
         reminderInterval = Int(task.reminderInterval)
         reminderStartTime = task.reminderStartTime
         reminderEndTime = task.reminderEndTime
-        snoozeMaxCount = Int(task.snoozeMaxCount)
-        snoozeUnlimited = task.snoozeUnlimited
         isRepeating = task.isRepeating
         repeatPattern = task.repeatPattern
         repeatEndDate = task.repeatEndDate
@@ -199,9 +195,7 @@ class TaskEditViewModel: ObservableObject {
         task.reminderInterval = Int32(reminderInterval)
         task.reminderStartTime = reminderStartTime
         task.reminderEndTime = reminderEndTime
-        task.snoozeMaxCount = Int32(snoozeMaxCount)
-        task.snoozeUnlimited = snoozeUnlimited
-        
+
         // 繰り返し設定
         task.isRepeating = isRepeating
         task.repeatPattern = repeatPattern

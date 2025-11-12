@@ -12,8 +12,6 @@ struct ReminderSettingView: View {
     @Binding var interval: Int
     let priority: Priority
     let taskType: TaskType
-    @Binding var snoozeMaxCount: Int
-    @Binding var snoozeUnlimited: Bool
     @Binding var reminderEndTime: Date?
     let deadline: Date?
     let startDateTime: Date?
@@ -80,41 +78,7 @@ struct ReminderSettingView: View {
                     }
                     .font(.subheadline)
                 }
-                
-                // スヌーズ設定
-                VStack(alignment: .leading, spacing: 8) {
-                    // 期限超過判定
-                    let isOverdue: Bool = {
-                        if let deadline = deadline {
-                            return deadline < Date()
-                        } else if let startDateTime = startDateTime {
-                            return startDateTime < Date()
-                        } else {
-                            return false
-                        }
-                    }()
 
-                    if isOverdue {
-                        // 期限超過時は読み取り専用表示
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text("スヌーズ最大回数:")
-                                Spacer()
-                                Text("無制限")
-                                    .foregroundColor(.secondary)
-                            }
-                            .font(.subheadline)
-
-                            Text("ℹ️ 期限超過のため制限なし")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    } else {
-                        // 期限前は通常のStepper
-                        Stepper("スヌーズ最大回数: \(snoozeMaxCount)回", value: $snoozeMaxCount, in: 1...10)
-                    }
-                }
-                
                 // リマインド終了時刻設定
                 VStack(alignment: .leading, spacing: 8) {
                     Toggle("リマインド終了時刻を設定", isOn: $showReminderEndTimePicker)

@@ -38,7 +38,6 @@
         <attribute name="isArchived" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="isCompleted" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="isRepeating" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
-        <attribute name="lastSnoozeDateTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="parentTaskId" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="priority" optional="YES" attributeType="String"/>
         <attribute name="reminderEnabled" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
@@ -47,9 +46,6 @@
         <attribute name="reminderStartTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="repeatEndDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="repeatPatternData" optional="YES" attributeType="Binary"/>
-        <attribute name="snoozeCount" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="snoozeMaxCount" attributeType="Integer 32" defaultValueString="5" usesScalarValueType="YES"/>
-        <attribute name="snoozeUnlimited" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="startDateTime" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="taskType" optional="YES" attributeType="String"/>
         <attribute name="title" attributeType="String"/>

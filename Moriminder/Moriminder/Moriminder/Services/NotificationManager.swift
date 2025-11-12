@@ -238,54 +238,7 @@ class NotificationManager {
             center.removePendingNotificationRequests(withIdentifiers: reminderNotificationIds)
         }
     }
-    
-    // スヌーズ処理
-    func snoozeReminder(for task: Task) async throws {
-        // スヌーズ回数をチェック
-        // 注意: スヌーズ最大回数は通知スケジューリング時ではなく、
-        // 通知が配信された後にユーザーが「スヌーズ」ボタンを押した時に適用される
-        let snoozeCount = Int(task.snoozeCount)
-        let snoozeMaxCount = Int(task.snoozeMaxCount)
 
-        // 期限超過チェック（仕様: 期限超過アイテムに対しては無期限スヌーズを適用）
-        let isOverdue: Bool
-        if let deadline = task.deadline {
-            isOverdue = deadline < Date()
-        } else if let startDateTime = task.startDateTime {
-            isOverdue = startDateTime < Date()
-        } else {
-            isOverdue = false
-        }
-
-        // 期限超過の場合は自動的に無制限スヌーズ
-        let effectiveSnoozeUnlimited = task.snoozeUnlimited || isOverdue
-
-        guard snoozeCount < snoozeMaxCount || effectiveSnoozeUnlimited else {
-            throw NotificationError.maxSnoozeReached
-        }
-        
-        // 日付が変わったかチェック（リセット判定）
-        let today = Calendar.current.startOfDay(for: Date())
-        let lastSnoozeDate = Calendar.current.startOfDay(for: task.lastSnoozeDateTime ?? Date.distantPast)
-        
-        if today > lastSnoozeDate {
-            // 日付が変わったのでカウンターをリセット
-            task.snoozeCount = 0
-        }
-        
-        // スヌーズ回数をインクリメント
-        task.snoozeCount += 1
-        task.lastSnoozeDateTime = Date()
-        
-        // 次のリマインド時刻を計算（現在時刻 + リマインド間隔）
-        let nextReminderTime = Date().addingTimeInterval(
-            TimeInterval(Int(task.reminderInterval) * 60)
-        )
-        
-        // 次のリマインド通知をスケジュール
-        try await scheduleReminderNotification(for: task, at: nextReminderTime)
-    }
-    
     // 通知が配信された後、次の通知をスケジュール（終了日時がない場合）
     func scheduleNextReminderAfterDelivery(for task: Task, deliveredAt: Date) async throws {
         guard task.reminderEnabled else { return }

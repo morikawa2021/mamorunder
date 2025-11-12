@@ -149,9 +149,7 @@ class RepeatingTaskGenerator {
         task.reminderInterval = parentTask.reminderInterval
         task.reminderStartTime = parentTask.reminderStartTime
         task.reminderEndTime = parentTask.reminderEndTime
-        task.snoozeMaxCount = parentTask.snoozeMaxCount
-        task.snoozeUnlimited = parentTask.snoozeUnlimited
-        
+
         // 繰り返し設定
         task.isRepeating = true
         task.repeatPattern = pattern

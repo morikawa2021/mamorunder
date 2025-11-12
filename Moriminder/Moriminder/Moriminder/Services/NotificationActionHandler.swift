@@ -70,13 +70,6 @@ class NotificationActionHandler: NSObject, UNUserNotificationCenterDelegate {
         }
         
         switch response.actionIdentifier {
-        case "SNOOZE":
-            _Concurrency.Task {
-                try? await notificationManager.snoozeReminder(for: task)
-                // スヌーズ後、Core Dataを保存
-                try? task.managedObjectContext?.save()
-            }
-            
         case "COMPLETE":
             // 通知アクションからの完了は、NotificationCenterでイベントを送信
             // UI層で確認ダイアログを表示する
@@ -146,11 +139,6 @@ extension UNNotificationCategory {
             identifier: "ALARM",
             actions: [
                 UNNotificationAction(
-                    identifier: "SNOOZE",
-                    title: "スヌーズ",
-                    options: []
-                ),
-                UNNotificationAction(
                     identifier: "COMPLETE",
                     title: "完了",
                     options: [.foreground]
@@ -168,11 +156,6 @@ extension UNNotificationCategory {
         let reminderCategory = UNNotificationCategory(
             identifier: "REMINDER",
             actions: [
-                UNNotificationAction(
-                    identifier: "SNOOZE",
-                    title: "スヌーズ",
-                    options: []
-                ),
                 UNNotificationAction(
                     identifier: "COMPLETE",
                     title: "完了",
