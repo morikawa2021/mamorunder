@@ -21,7 +21,8 @@ class NotificationActionHandler: NSObject, UNUserNotificationCenterDelegate {
         super.init()
     }
     
-    // 通知が配信された時（バックグラウンドでも呼ばれる）
+    // 通知が配信された時（アプリがフォアグラウンドにある場合のみ呼ばれる）
+    // iOS仕様: バックグラウンドや通知をスルーした場合、このメソッドは呼ばれない
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,

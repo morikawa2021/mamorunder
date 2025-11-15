@@ -28,12 +28,28 @@ class NotificationRefreshService {
 
         // 1. 現在スケジュール済みの通知数を確認
         let pendingRequests = await notificationManager.getPendingNotifications()
+        let deliveredNotifications = await notificationManager.getDeliveredNotifications()
         let currentCount = pendingRequests.count
 
-        print("📊 現在の通知数: \(currentCount)/64")
+        print("📊 現在の通知数: \(currentCount)/64 (配信済み: \(deliveredNotifications.count)個)")
 
-        // 2. 64個に近い場合、過去の通知を削除
-        if currentCount > 55 {
+        // 2. 配信済み通知の古いものを削除（1日以上前）
+        let oneDayAgo = Date().addingTimeInterval(-24 * 60 * 60)
+        let oldDeliveredIds = deliveredNotifications.compactMap { notification -> String? in
+            if notification.date < oneDayAgo {
+                return notification.request.identifier
+            }
+            return nil
+        }
+
+        if !oldDeliveredIds.isEmpty {
+            await UNUserNotificationCenter.current()
+                .removeDeliveredNotifications(withIdentifiers: oldDeliveredIds)
+            print("🗑️ 古い配信済み通知を削除: \(oldDeliveredIds.count)個")
+        }
+
+        // 3. 50個を超えている場合、過去の予定通知を削除
+        if currentCount > 50 {
             let outdatedNotifications = pendingRequests.filter { request in
                 guard let trigger = request.trigger as? UNCalendarNotificationTrigger,
                       let nextTriggerDate = Calendar.current.date(from: trigger.dateComponents) else {
@@ -46,14 +62,14 @@ class NotificationRefreshService {
             if !outdatedIds.isEmpty {
                 await UNUserNotificationCenter.current()
                     .removePendingNotificationRequests(withIdentifiers: outdatedIds)
-                print("🗑️ 過去の通知を削除: \(outdatedIds.count)個")
+                print("🗑️ 過去の予定通知を削除: \(outdatedIds.count)個")
             }
         }
 
-        // 3. アクティブなタスクを取得
+        // 4. アクティブなタスクを取得
         let activeTasks = await fetchActiveTasks()
 
-        // 4. 各タスクの通知数を確認し、不足していれば補充
+        // 5. 各タスクの通知数を確認し、不足していれば補充
         var totalAdded = 0
 
         for task in activeTasks {

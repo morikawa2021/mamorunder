@@ -296,11 +296,16 @@ class NotificationManager {
         }
     }
     
-    // 予定されている通知の一覧を取得
+    // 予定されている通知の一覧を取得（未配信）
     func getPendingNotifications() async -> [UNNotificationRequest] {
         return await center.pendingNotificationRequests()
     }
-    
+
+    // 配信済みの通知の一覧を取得（Notification Centerに表示中）
+    func getDeliveredNotifications() async -> [UNNotification] {
+        return await center.deliveredNotifications()
+    }
+
     // 通知の詳細情報を取得（デバッグ用）
     func getNotificationDetails() async -> NotificationDetails {
         let pendingRequests = await center.pendingNotificationRequests()
