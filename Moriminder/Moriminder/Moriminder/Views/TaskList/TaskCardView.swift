@@ -27,17 +27,21 @@ struct TaskCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             // タスク名
             HStack(spacing: 8) {
-                // 完了チェックマーク
-                if task.isCompleted {
+                // 完了チェックマークまたはアーカイブアイコン
+                if task.isArchived {
+                    Image(systemName: "archivebox.fill")
+                        .foregroundColor(.orange)
+                        .font(.headline)
+                } else if task.isCompleted {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                         .font(.headline)
                 }
-                
+
                 Text(task.title ?? "無題のタスク")
                     .font(.headline)
-                    .strikethrough(task.isCompleted)
-                    .foregroundColor(task.isCompleted ? .secondary : .primary)
+                    .strikethrough(task.isCompleted || task.isArchived)
+                    .foregroundColor(task.isCompleted || task.isArchived ? .secondary : .primary)
             }
             
             HStack {
@@ -121,7 +125,7 @@ struct TaskCardView: View {
             }
         }
         .padding()
-        .opacity(task.isCompleted ? 0.7 : 1.0)
+        .opacity(task.isCompleted || task.isArchived ? 0.7 : 1.0)
         .contentShape(Rectangle())
         .onTapGesture {
             onTap?()

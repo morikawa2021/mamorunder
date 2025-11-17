@@ -50,7 +50,7 @@ struct MoriminderApp: App {
         UNUserNotificationCenter.current().delegate = notificationActionHandler
 
         // BackgroundTaskManagerを設定
-        BackgroundTaskManager.shared.configure(refreshService: notificationRefreshService)
+        BackgroundTaskManager.shared.configure(refreshService: notificationRefreshService, taskManager: taskManager)
         BackgroundTaskManager.shared.registerBackgroundTasks()
 
         // 通知カテゴリの登録
@@ -71,6 +71,15 @@ struct MoriminderApp: App {
                     _Concurrency.Task {
                         try? await notificationRefreshService.refreshNotifications()
                     }
+                    // アプリ起動時に自動アーカイブを実行
+                    _Concurrency.Task {
+                        let viewContext = persistenceController.container.viewContext
+                        let taskManager = TaskManager(viewContext: viewContext)
+                        let archivedCount = try? await taskManager.performAutoArchive()
+                        if let count = archivedCount, count > 0 {
+                            print("自動アーカイブ: \(count)件のタスクをアーカイブしました")
+                        }
+                    }
                     // 最初のバックグラウンドタスクをスケジュール
                     BackgroundTaskManager.shared.scheduleNextBackgroundTask()
                 }
@@ -80,6 +89,15 @@ struct MoriminderApp: App {
                 // フォアグラウンド復帰時に通知をリフレッシュ
                 _Concurrency.Task {
                     try? await notificationRefreshService.refreshNotifications()
+                }
+                // フォアグラウンド復帰時に自動アーカイブを実行
+                _Concurrency.Task {
+                    let viewContext = persistenceController.container.viewContext
+                    let taskManager = TaskManager(viewContext: viewContext)
+                    let archivedCount = try? await taskManager.performAutoArchive()
+                    if let count = archivedCount, count > 0 {
+                        print("自動アーカイブ: \(count)件のタスクをアーカイブしました")
+                    }
                 }
             }
         }

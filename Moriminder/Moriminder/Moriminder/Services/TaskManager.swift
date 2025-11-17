@@ -12,6 +12,7 @@ import UserNotifications
 class TaskManager {
     private let viewContext: NSManagedObjectContext
     private let notificationManager: NotificationManager
+    private let archiveService: TaskArchiveService
     private var repeatingTaskGenerator: RepeatingTaskGenerator {
         RepeatingTaskGenerator(
             taskManager: self,
@@ -19,10 +20,11 @@ class TaskManager {
             viewContext: viewContext
         )
     }
-    
+
     init(viewContext: NSManagedObjectContext) {
         self.viewContext = viewContext
         self.notificationManager = NotificationManager()
+        self.archiveService = TaskArchiveService(viewContext: viewContext)
     }
     
     // タスク作成
@@ -154,15 +156,22 @@ class TaskManager {
         
         switch filter {
         case .all:
-            break
+            // アーカイブ済みは除外（すべて = アーカイブ以外のすべて）
+            predicates.append(NSPredicate(format: "isArchived == NO"))
         case .incomplete:
             predicates.append(NSPredicate(format: "isCompleted == NO"))
+            predicates.append(NSPredicate(format: "isArchived == NO"))
         case .completed:
             predicates.append(NSPredicate(format: "isCompleted == YES"))
+            predicates.append(NSPredicate(format: "isArchived == NO"))
+        case .archived:
+            predicates.append(NSPredicate(format: "isArchived == YES"))
         case .category(let categoryName):
             predicates.append(NSPredicate(format: "category.name == %@", categoryName))
+            predicates.append(NSPredicate(format: "isArchived == NO"))
         case .priority(let priority):
             predicates.append(NSPredicate(format: "priority == %@", priority.rawValue))
+            predicates.append(NSPredicate(format: "isArchived == NO"))
         }
         
         if !predicates.isEmpty {
@@ -278,12 +287,27 @@ class TaskManager {
         try viewContext.save()
     }
     
+    // タスクアーカイブ
+    func archiveTask(_ task: Task) async throws {
+        try archiveService.archiveTask(task)
+    }
+
+    // タスクのアーカイブ解除（復元）
+    func unarchiveTask(_ task: Task) async throws {
+        try archiveService.unarchiveTask(task)
+    }
+
+    // 自動アーカイブ実行
+    func performAutoArchive(daysAfterCompletion: Int = TaskArchiveService.defaultArchiveDays) async throws -> Int {
+        return try await archiveService.archiveCompletedTasks(olderThan: daysAfterCompletion)
+    }
+
     // バリデーション
     private func validateTask(_ task: Task) throws {
         guard let title = task.title, !title.isEmpty else {
             throw TaskError.invalidTitle
         }
-        
+
         // 日時設定のバリデーション
         if let deadline = task.deadline, let startDateTime = task.startDateTime {
             guard deadline >= startDateTime else {

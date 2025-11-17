@@ -11,9 +11,10 @@ enum FilterMode: Equatable {
     case all
     case incomplete
     case completed
+    case archived
     case category(String)
     case priority(Priority)
-    
+
     var displayName: String {
         switch self {
         case .all:
@@ -22,6 +23,8 @@ enum FilterMode: Equatable {
             return "未完了"
         case .completed:
             return "完了済み"
+        case .archived:
+            return "アーカイブ済み"
         case .category(let categoryName):
             return "カテゴリ: \(categoryName)"
         case .priority(let priority):
@@ -126,7 +129,19 @@ struct FilterSortBar: View {
                         }
                     }
                 }
-                
+
+                Button {
+                    filterMode = .archived
+                } label: {
+                    HStack {
+                        Text("アーカイブ済み")
+                        Spacer()
+                        if filterMode == .archived {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+
                 if !categories.isEmpty {
                     Divider()
                     

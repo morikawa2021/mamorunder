@@ -40,24 +40,46 @@ struct TaskListView: View {
                             }
                         )
                             .listRowBackground(
-                                task.isCompleted
-                                    ? Color.gray.opacity(0.1)
-                                    : Color.clear
+                                task.isArchived
+                                    ? Color.orange.opacity(0.1)
+                                    : task.isCompleted
+                                        ? Color.gray.opacity(0.1)
+                                        : Color.clear
                             )
                             .swipeActions(edge: .trailing) {
-                                // 完了アクション
-                                Button {
-                                    viewModel.requestCompleteTask(task)
-                                } label: {
-                                    Label("完了", systemImage: "checkmark")
+                                // 完了アクション（アーカイブ済みでない場合のみ）
+                                if !task.isArchived {
+                                    Button {
+                                        viewModel.requestCompleteTask(task)
+                                    } label: {
+                                        Label("完了", systemImage: "checkmark")
+                                    }
+                                    .tint(.green)
                                 }
-                                .tint(.green)
-                                
+
                                 // 削除アクション
                                 Button(role: .destructive) {
                                     viewModel.requestDeleteTask(task)
                                 } label: {
                                     Label("削除", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions(edge: .leading) {
+                                // アーカイブまたは復元アクション
+                                if task.isArchived {
+                                    Button {
+                                        viewModel.unarchiveTask(task)
+                                    } label: {
+                                        Label("復元", systemImage: "arrow.uturn.backward")
+                                    }
+                                    .tint(.blue)
+                                } else if task.isCompleted {
+                                    Button {
+                                        viewModel.archiveTask(task)
+                                    } label: {
+                                        Label("アーカイブ", systemImage: "archivebox")
+                                    }
+                                    .tint(.orange)
                                 }
                             }
                     }

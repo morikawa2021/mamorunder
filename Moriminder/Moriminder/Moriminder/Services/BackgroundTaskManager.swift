@@ -14,12 +14,14 @@ class BackgroundTaskManager {
 
     private let taskIdentifier = "jp.co.softstudio.Moriminder.notification-refresh"
     private var notificationRefreshService: NotificationRefreshService?
+    private var taskManager: TaskManager?
 
     private init() {}
 
-    // NotificationRefreshServiceを設定
-    func configure(refreshService: NotificationRefreshService) {
+    // NotificationRefreshServiceとTaskManagerを設定
+    func configure(refreshService: NotificationRefreshService, taskManager: TaskManager) {
         self.notificationRefreshService = refreshService
+        self.taskManager = taskManager
     }
 
     // バックグラウンドタスクを登録
@@ -60,10 +62,20 @@ class BackgroundTaskManager {
             print("⏱️ バックグラウンドタスクがタイムアウトしました")
         }
 
-        // 通知リフレッシュを実行
+        // 通知リフレッシュと自動アーカイブを実行
         _Concurrency.Task {
             do {
+                // 通知リフレッシュ
                 try await self.notificationRefreshService?.refreshNotifications()
+
+                // 自動アーカイブ
+                if let taskManager = self.taskManager {
+                    let archivedCount = try await taskManager.performAutoArchive()
+                    if archivedCount > 0 {
+                        print("🗄️ バックグラウンド自動アーカイブ: \(archivedCount)件")
+                    }
+                }
+
                 task.setTaskCompleted(success: true)
                 print("✅ バックグラウンドタスク完了")
             } catch {

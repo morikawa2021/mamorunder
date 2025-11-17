@@ -12,7 +12,7 @@ import Combine
 
 class TaskListViewModel: ObservableObject {
     @Published var tasks: [Task] = []
-    @Published var filterMode: FilterMode = .all
+    @Published var filterMode: FilterMode = .incomplete
     @Published var sortMode: SortMode = .deadlineAsc
     @Published var showAddTask = false
     @Published var taskToComplete: Task?
@@ -108,18 +108,36 @@ class TaskListViewModel: ObservableObject {
     func confirmStopReminder() {
         guard let task = taskToStopReminder else { return }
         taskToStopReminder = nil
-        
+
         // リマインドを無効化
         task.reminderEnabled = false
-        
+
         _Concurrency.Task {
             // 通知をキャンセル
             let notificationManager = NotificationManager()
             await notificationManager.cancelNotifications(for: task)
-            
+
             // Core Dataを保存
             try? viewContext.save()
-            
+
+            await MainActor.run {
+                loadTasks()
+            }
+        }
+    }
+
+    func archiveTask(_ task: Task) {
+        _Concurrency.Task {
+            try? await taskManager.archiveTask(task)
+            await MainActor.run {
+                loadTasks()
+            }
+        }
+    }
+
+    func unarchiveTask(_ task: Task) {
+        _Concurrency.Task {
+            try? await taskManager.unarchiveTask(task)
             await MainActor.run {
                 loadTasks()
             }
