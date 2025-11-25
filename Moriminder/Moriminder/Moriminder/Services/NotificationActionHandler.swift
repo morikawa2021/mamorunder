@@ -10,6 +10,11 @@ import UserNotifications
 import CoreData
 
 class NotificationActionHandler: NSObject, UNUserNotificationCenterDelegate {
+    // コールド起動時の保留状態（static変数で早期に保持）
+    static var pendingTaskDetailId: UUID?
+    static var pendingTaskCompleteId: UUID?
+    static var pendingTaskStopReminderId: UUID?
+
     private let taskManager: TaskManager
     private let notificationManager: NotificationManager
     private let notificationRefreshService: NotificationRefreshService
@@ -56,6 +61,8 @@ class NotificationActionHandler: NSObject, UNUserNotificationCenterDelegate {
 
         switch response.actionIdentifier {
         case "COMPLETE":
+            // コールド起動用にstatic変数に保存
+            NotificationActionHandler.pendingTaskCompleteId = taskId
             // 通知アクションからの完了は、NotificationCenterでイベントを送信
             // UI層で確認ダイアログを表示する
             NotificationCenter.default.post(
@@ -65,6 +72,8 @@ class NotificationActionHandler: NSObject, UNUserNotificationCenterDelegate {
             )
 
         case "OPEN":
+            // コールド起動用にstatic変数に保存
+            NotificationActionHandler.pendingTaskDetailId = taskId
             // アプリを開いてタスク詳細画面を表示
             NotificationCenter.default.post(
                 name: NSNotification.Name("TaskDetailRequested"),
@@ -73,6 +82,8 @@ class NotificationActionHandler: NSObject, UNUserNotificationCenterDelegate {
             )
 
         default:
+            // コールド起動用にstatic変数に保存
+            NotificationActionHandler.pendingTaskDetailId = taskId
             // 通知をタップした場合（デフォルト動作）
             // アプリを開いてタスク詳細画面を表示
             NotificationCenter.default.post(

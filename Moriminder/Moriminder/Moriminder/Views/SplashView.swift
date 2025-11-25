@@ -6,16 +6,19 @@
 //
 
 import SwiftUI
+import CoreData
 
 struct SplashView: View {
     @State private var isActive = false
     @State private var opacity = 0.0
     @Environment(\.managedObjectContext) private var viewContext
-    
+    @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
+
     var body: some View {
         if isActive {
             TaskListView()
                 .environment(\.managedObjectContext, viewContext)
+                .environmentObject(navigationCoordinator)
         } else {
             ZStack {
                 // 背景色（アプリのテーマカラーに合わせる）
@@ -53,10 +56,17 @@ struct SplashView: View {
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         isActive = true
+                        navigationCoordinator.markUIReady()
                     }
                 }
             }
         }
     }
+}
+
+#Preview {
+    SplashView()
+        .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+        .environmentObject(NavigationCoordinator.shared)
 }
 

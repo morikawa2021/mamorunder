@@ -70,6 +70,10 @@ class TaskListViewModel: ObservableObject {
             sort: sortMode
         )
     }
+
+    func fetchTask(id: UUID) -> Task? {
+        return taskManager.fetchTask(id: id)
+    }
     
     func requestCompleteTask(_ task: Task) {
         // 確認ダイアログを表示するためにタスクを設定

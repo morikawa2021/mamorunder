@@ -14,10 +14,14 @@ struct MoriminderApp: App {
     let persistenceController = PersistenceController.shared
     private let notificationActionHandler: NotificationActionHandler
     private let notificationRefreshService: NotificationRefreshService
+    @StateObject private var navigationCoordinator = NavigationCoordinator.shared
 
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        // NavigationCoordinatorを確実に初期化（通知デリゲート設定前に）
+        _ = NavigationCoordinator.shared
+
         // アプリ全体のロケールを日本語に設定
         if let path = Bundle.main.path(forResource: "ja", ofType: "lproj"),
            let _ = Bundle(path: path) {
@@ -66,6 +70,7 @@ struct MoriminderApp: App {
         WindowGroup {
             SplashView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                .environmentObject(navigationCoordinator)
                 .onAppear {
                     // アプリ起動時に通知をリフレッシュ
                     _Concurrency.Task {

@@ -11,6 +11,7 @@ import CoreData
 struct TaskListView: View {
     @StateObject private var viewModel = TaskListViewModel()
     @Environment(\.managedObjectContext) private var viewContext
+    @EnvironmentObject private var navigationCoordinator: NavigationCoordinator
     @State private var taskToSubdivide: Task?
     @State private var showCategoryManagement = false
     @State private var showNotificationDebug = false
@@ -197,6 +198,31 @@ struct TaskListView: View {
             .sheet(isPresented: $showNotificationDebug) {
                 NotificationDebugView()
             }
+            // NavigationCoordinatorの状態を監視してナビゲーション
+            .onChange(of: navigationCoordinator.taskDetailToShow) { _, newValue in
+                if let taskId = newValue {
+                    if let task = viewModel.fetchTask(id: taskId) {
+                        viewModel.taskToShowDetail = task
+                    }
+                    navigationCoordinator.clearTaskDetail()
+                }
+            }
+            .onChange(of: navigationCoordinator.taskToComplete) { _, newValue in
+                if let taskId = newValue {
+                    if let task = viewModel.fetchTask(id: taskId) {
+                        viewModel.taskToComplete = task
+                    }
+                    navigationCoordinator.clearTaskToComplete()
+                }
+            }
+            .onChange(of: navigationCoordinator.taskToStopReminder) { _, newValue in
+                if let taskId = newValue {
+                    if let task = viewModel.fetchTask(id: taskId) {
+                        viewModel.taskToStopReminder = task
+                    }
+                    navigationCoordinator.clearTaskToStopReminder()
+                }
+            }
         }
     }
 }
@@ -205,5 +231,6 @@ struct TaskListView: View {
 #Preview {
     TaskListView()
         .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+        .environmentObject(NavigationCoordinator.shared)
 }
 
