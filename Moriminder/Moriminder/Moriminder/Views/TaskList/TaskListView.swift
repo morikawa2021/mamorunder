@@ -134,7 +134,7 @@ struct TaskListView: View {
             ), onDismiss: {
                 viewModel.loadTasks()
             }) { task in
-                TaskEditView(mode: .edit(task))
+                TaskDetailView(task: task)
                     .environment(\.managedObjectContext, viewContext)
             }
             .alert("タスクを完了しますか？", isPresented: Binding(

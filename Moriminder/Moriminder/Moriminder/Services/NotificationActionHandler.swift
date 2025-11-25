@@ -74,7 +74,12 @@ class NotificationActionHandler: NSObject, UNUserNotificationCenterDelegate {
 
         default:
             // 通知をタップした場合（デフォルト動作）
-            break
+            // アプリを開いてタスク詳細画面を表示
+            NotificationCenter.default.post(
+                name: NSNotification.Name("TaskDetailRequested"),
+                object: nil,
+                userInfo: ["taskId": taskId]
+            )
         }
 
         // 完了アクション以外の場合、通知をリフレッシュして5件のバッファを維持
