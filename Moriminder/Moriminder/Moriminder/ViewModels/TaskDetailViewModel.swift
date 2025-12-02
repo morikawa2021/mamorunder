@@ -63,33 +63,59 @@ class TaskDetailViewModel: ObservableObject {
         return formatDateTime(startDateTime)
     }
 
-    var formattedAlarm: String {
-        guard task.alarmEnabled, let alarmDateTime = task.alarmDateTime else {
-            return "オフ"
+    /// 開始時刻の通知設定の表示テキスト
+    var formattedStartTimeNotification: String {
+        guard task.startDateTime != nil else {
+            return "開始時刻未設定"
         }
-        return formatDateTime(alarmDateTime)
+
+        switch task.startTimeNotificationType {
+        case .none:
+            return "通知なし"
+        case .once:
+            return "開始時刻に1回通知"
+        case .remind:
+            let offsetText = formatOffset(Int(task.startTimeReminderOffset))
+            let intervalText = formatInterval(Int(task.startTimeReminderInterval))
+            return "\(offsetText)から\(intervalText)ごとに通知"
+        }
     }
 
-    var formattedReminder: String {
-        guard task.reminderEnabled else {
-            return "オフ"
+    /// 期限の通知設定の表示テキスト
+    var formattedDeadlineNotification: String {
+        guard task.deadline != nil else {
+            return "期限未設定"
         }
 
-        let interval = formatReminderInterval(Int(task.reminderInterval))
+        switch task.deadlineNotificationType {
+        case .none:
+            return "通知なし"
+        case .once:
+            return "期限に1回通知"
+        case .remind:
+            let offsetText = formatOffset(Int(task.deadlineReminderOffset))
+            let intervalText = formatInterval(Int(task.deadlineReminderInterval))
+            return "\(offsetText)から\(intervalText)ごとに通知"
+        }
+    }
 
-        var components: [String] = [interval]
+    /// 通知設定の概要テキスト
+    var formattedNotificationSummary: String {
+        var summaries: [String] = []
 
-        if let startTime = task.reminderStartTime {
-            components.append("開始: \(formatDateTime(startTime))")
+        if task.hasStartTimeNotification {
+            summaries.append("開始: \(formattedStartTimeNotification)")
         }
 
-        if let endTime = task.reminderEndTime {
-            components.append("終了: \(formatDateTime(endTime))")
-        } else {
-            components.append("完了まで継続")
+        if task.hasDeadlineNotification {
+            summaries.append("期限: \(formattedDeadlineNotification)")
         }
 
-        return components.joined(separator: "\n")
+        if summaries.isEmpty {
+            return "通知なし"
+        }
+
+        return summaries.joined(separator: "\n")
     }
 
     var formattedRepeat: String {
@@ -177,6 +203,30 @@ class TaskDetailViewModel: ObservableObject {
         } else {
             let days = minutes / 1440
             return "\(days)日ごと"
+        }
+    }
+
+    private func formatOffset(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes)分前"
+        } else if minutes < 1440 {
+            let hours = minutes / 60
+            return "\(hours)時間前"
+        } else {
+            let days = minutes / 1440
+            return "\(days)日前"
+        }
+    }
+
+    private func formatInterval(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes)分"
+        } else if minutes < 1440 {
+            let hours = minutes / 60
+            return "\(hours)時間"
+        } else {
+            let days = minutes / 1440
+            return "\(days)日"
         }
     }
 

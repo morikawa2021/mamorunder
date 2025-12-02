@@ -9,13 +9,26 @@ import Foundation
 import UserNotifications
 import CoreData
 
+/// 通知の時間ポイントタイプ
+enum TimePointType: String {
+    case startTime = "starttime"
+    case deadline = "deadline"
+
+    var displayName: String {
+        switch self {
+        case .startTime: return "開始時刻"
+        case .deadline: return "期限"
+        }
+    }
+}
+
 class NotificationManager {
     private let center = UNUserNotificationCenter.current()
-    
-    // 通知権限の要求
+
+    // MARK: - Authorization
+
+    /// 通知権限の要求
     func requestAuthorization() async throws {
-        // .provisionalを削除して、通常の通知権限のみを要求
-        // これにより、デフォルト設定でロック画面、通知センター、バナーがすべてONになる可能性が高くなります
         let granted = try await center.requestAuthorization(options: [
             .alert, .sound, .badge
         ])
@@ -24,159 +37,71 @@ class NotificationManager {
             throw NotificationError.authorizationDenied
         }
     }
-    
-    // 通知権限の状態を確認
+
+    /// 通知権限の状態を確認
     func checkAuthorizationStatus() async -> UNAuthorizationStatus {
         let settings = await center.notificationSettings()
         return settings.authorizationStatus
     }
-    
-    // アラーム通知のスケジュール
-    func scheduleAlarm(for task: Task) async throws {
-        print("🔔 アラームスケジュール開始: \(task.title ?? "無題")")
-        print("  - alarmEnabled: \(task.alarmEnabled)")
-        print("  - alarmDateTime: \(task.alarmDateTime?.description ?? "nil")")
-        print("  - task.id: \(task.id?.uuidString ?? "nil")")
-        
-        guard let alarmDateTime = task.alarmDateTime else {
-            print("❌ アラーム時刻が設定されていません")
-            return
-        }
-        
-        guard alarmDateTime > Date() else {
-            print("❌ 警告: アラーム時刻が過去です: \(alarmDateTime)")
-            return
-        }
-        
-        // 通知権限を確認
-        let authorizationStatus = await checkAuthorizationStatus()
-        print("  - 通知権限状態: \(authorizationStatus.rawValue)")
-        guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
-            print("❌ 通知権限が許可されていません")
-            throw NotificationError.authorizationDenied
-        }
-        
-        let content = UNMutableNotificationContent()
-        let baseTitle = task.title ?? "タスク"
-        content.title = formatNotificationTitle(baseTitle, for: task)
-        content.body = "設定時刻になりました"
-        if let soundName = task.alarmSound {
-            content.sound = UNNotificationSound(named: UNNotificationSoundName(soundName))
-        } else {
-            content.sound = .default
-        }
-        content.categoryIdentifier = "ALARM"
-        
-        // 重要度設定（アラームは重要なので、デフォルトでtimeSensitive）
-        if let priorityString = task.priority,
-           let priority = Priority(rawValue: priorityString) {
-            content.interruptionLevel = mapPriorityToInterruptionLevel(priority)
-        } else {
-            // 優先度が設定されていない場合でも、アラームは重要なのでtimeSensitiveに設定
-            content.interruptionLevel = .timeSensitive
-        }
-        
-        // スケジュール
-        var components = Calendar.current.dateComponents(
-            [.year, .month, .day, .hour, .minute],
-            from: alarmDateTime
-        )
-        components.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        let trigger = UNCalendarNotificationTrigger(
-            dateMatching: components,
-            repeats: false
-        )
-        
-        let identifier = "alarm_\(task.id?.uuidString ?? UUID().uuidString)"
-        let request = UNNotificationRequest(
-            identifier: identifier,
-            content: content,
-            trigger: trigger
-        )
-        
-        print("  - 通知識別子: \(identifier)")
-        print("  - 通知予定時刻: \(alarmDateTime)")
-        
-        try await center.add(request)
-        print("✅ アラーム通知スケジュール成功: \(task.title ?? "無題") at \(alarmDateTime)")
-        
-        // スケジュールされた通知を確認
-        let pendingRequests = await center.pendingNotificationRequests()
-        let scheduledAlarm = pendingRequests.first { $0.identifier == identifier }
-        if scheduledAlarm != nil {
-            print("✅ スケジュール確認: 通知が正常に登録されました")
-        } else {
-            print("⚠️ 警告: スケジュール確認: 通知が見つかりませんでした")
-        }
-    }
-    
-    // リマインド通知のスケジュール
-    func scheduleReminder(for task: Task) async throws {
-        guard task.reminderEnabled else { return }
-        
-        let reminderService = ReminderService(notificationManager: self)
-        try await reminderService.scheduleReminder(for: task)
-    }
-    
-    // リマインド通知のスケジュール（個別）
-    func scheduleReminderNotification(for task: Task, at date: Date) async throws {
-        guard date > Date() else {
-            print("警告: リマインド時刻が過去です: \(date)")
-            return
-        }
-        
-        // 通知権限を確認
-        let authorizationStatus = await checkAuthorizationStatus()
-        guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
-            throw NotificationError.authorizationDenied
-        }
-        
-        let content = UNMutableNotificationContent()
-        let baseTitle = task.title ?? "タスク"
-        content.title = formatNotificationTitle(baseTitle, for: task)
 
-        // この通知配信時点での、期限/開始時刻までの残り時間を計算
-        let targetDate = task.startDateTime ?? task.deadline
-        let targetDesc = task.reminderTargetDescription
+    // MARK: - Schedule Notifications
 
-        if let targetDate = targetDate {
-            let remainingSeconds = targetDate.timeIntervalSince(date)
-            let remainingMinutes = Int(remainingSeconds / 60)
+    /// タスクの全ての通知をスケジュール
+    func scheduleNotifications(for task: Task) async throws {
+        print("🔔 通知スケジュール開始: \(task.title ?? "無題")")
 
-            if remainingMinutes > 60 {
-                // 60分以上の場合は時間単位で表示
-                let hours = remainingMinutes / 60
-                let minutes = remainingMinutes % 60
-                if minutes > 0 {
-                    content.body = "\(targetDesc)まであと\(hours)時間\(minutes)分"
-                } else {
-                    content.body = "\(targetDesc)まであと\(hours)時間"
-                }
-            } else if remainingMinutes > 0 {
-                content.body = "\(targetDesc)まであと\(remainingMinutes)分"
-            } else if remainingMinutes == 0 {
-                content.body = "\(targetDesc)です"
-            } else {
-                // 過去の場合
-                let overMinutes = abs(remainingMinutes)
-                content.body = "\(targetDesc)を\(overMinutes)分過ぎています"
+        // 開始時刻の通知
+        if let startDateTime = task.startDateTime {
+            switch task.startTimeNotificationType {
+            case .once:
+                try await scheduleOnceNotification(for: task, at: startDateTime, type: .startTime)
+            case .remind:
+                try await scheduleReminders(for: task, type: .startTime)
+                // リマインドの場合、最終通知も含まれる（スケジュールはReminderServiceで処理）
+            case .none:
+                break
             }
-        } else {
-            content.body = "タスクを確認してください"
         }
 
-        content.sound = .default
-        content.categoryIdentifier = "REMINDER"
-        
-        // 重要度設定（優先度が設定されていない場合はactiveをデフォルトとする）
-        if let priorityString = task.priority,
-           let priority = Priority(rawValue: priorityString) {
-            content.interruptionLevel = mapPriorityToInterruptionLevel(priority)
-        } else {
-            // 優先度が設定されていない場合は通常の通知レベル
-            content.interruptionLevel = .active
+        // 期限の通知
+        if let deadline = task.deadline {
+            switch task.deadlineNotificationType {
+            case .once:
+                try await scheduleOnceNotification(for: task, at: deadline, type: .deadline)
+            case .remind:
+                try await scheduleReminders(for: task, type: .deadline)
+                // リマインドの場合、最終通知も含まれる（スケジュールはReminderServiceで処理）
+            case .none:
+                break
+            }
         }
-        
+    }
+
+    /// 1回のみの通知をスケジュール
+    func scheduleOnceNotification(for task: Task, at date: Date, type: TimePointType) async throws {
+        print("🔔 1回通知スケジュール: \(task.title ?? "無題") - \(type.displayName)")
+
+        guard date > Date() else {
+            print("❌ 通知時刻が過去です: \(date)")
+            return
+        }
+
+        // 通知権限を確認
+        let authorizationStatus = await checkAuthorizationStatus()
+        guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
+            throw NotificationError.authorizationDenied
+        }
+
+        let content = UNMutableNotificationContent()
+        let baseTitle = task.title ?? "タスク"
+        content.title = formatNotificationTitle(baseTitle, for: task)
+        content.body = "\(type.displayName)です"
+        content.sound = .default
+        content.categoryIdentifier = "NOTIFICATION_ONCE"
+
+        // 重要度設定
+        content.interruptionLevel = mapPriorityToInterruptionLevel(task)
+
         // スケジュール
         var components = Calendar.current.dateComponents(
             [.year, .month, .day, .hour, .minute],
@@ -187,168 +112,236 @@ class NotificationManager {
             dateMatching: components,
             repeats: false
         )
-        
+
+        let identifier = "\(type.rawValue)_once_\(task.id?.uuidString ?? UUID().uuidString)"
         let request = UNNotificationRequest(
-            identifier: "reminder_\(task.id?.uuidString ?? UUID().uuidString)_\(Int(date.timeIntervalSince1970))",
+            identifier: identifier,
             content: content,
             trigger: trigger
         )
-        
+
+        try await center.add(request)
+        print("✅ 1回通知スケジュール成功: \(task.title ?? "無題") - \(type.displayName) at \(date)")
+    }
+
+    /// リマインド通知をスケジュール（ReminderServiceに委譲）
+    func scheduleReminders(for task: Task, type: TimePointType) async throws {
+        let reminderService = ReminderService(notificationManager: self)
+        try await reminderService.scheduleReminder(for: task, type: type)
+    }
+
+    /// リマインド通知（個別）をスケジュール
+    func scheduleReminderNotification(for task: Task, at date: Date, type: TimePointType, isFinal: Bool = false) async throws {
+        guard date > Date() else {
+            print("警告: リマインド時刻が過去です: \(date)")
+            return
+        }
+
+        // 通知権限を確認
+        let authorizationStatus = await checkAuthorizationStatus()
+        guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
+            throw NotificationError.authorizationDenied
+        }
+
+        let content = UNMutableNotificationContent()
+        let baseTitle = task.title ?? "タスク"
+        content.title = formatNotificationTitle(baseTitle, for: task)
+
+        // 本文を設定
+        let targetDate: Date?
+        switch type {
+        case .startTime:
+            targetDate = task.startDateTime
+        case .deadline:
+            targetDate = task.deadline
+        }
+
+        if let targetDate = targetDate {
+            let remainingSeconds = targetDate.timeIntervalSince(date)
+            let remainingMinutes = Int(remainingSeconds / 60)
+
+            if isFinal {
+                content.body = "\(type.displayName)です"
+            } else if remainingMinutes > 60 {
+                let hours = remainingMinutes / 60
+                let minutes = remainingMinutes % 60
+                if minutes > 0 {
+                    content.body = "\(type.displayName)まであと\(hours)時間\(minutes)分"
+                } else {
+                    content.body = "\(type.displayName)まであと\(hours)時間"
+                }
+            } else if remainingMinutes > 0 {
+                content.body = "\(type.displayName)まであと\(remainingMinutes)分"
+            } else if remainingMinutes == 0 {
+                content.body = "\(type.displayName)です"
+            } else {
+                let overMinutes = abs(remainingMinutes)
+                content.body = "\(type.displayName)を\(overMinutes)分過ぎています"
+            }
+        } else {
+            content.body = "タスクを確認してください"
+        }
+
+        content.sound = .default
+        content.categoryIdentifier = "NOTIFICATION_REMINDER"
+
+        // 重要度設定
+        content.interruptionLevel = mapPriorityToInterruptionLevel(task)
+
+        // スケジュール
+        var components = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute],
+            from: date
+        )
+        components.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: components,
+            repeats: false
+        )
+
+        let suffix = isFinal ? "final" : String(Int(date.timeIntervalSince1970))
+        let identifier = "\(type.rawValue)_reminder_\(task.id?.uuidString ?? UUID().uuidString)_\(suffix)"
+        let request = UNNotificationRequest(
+            identifier: identifier,
+            content: content,
+            trigger: trigger
+        )
+
         try await center.add(request)
     }
-    
-    // 通知のキャンセル（全て）
+
+    // MARK: - Cancel Notifications
+
+    /// タスクの全ての通知をキャンセル
     func cancelNotifications(for task: Task) async {
         guard let taskId = task.id?.uuidString else { return }
-        
-        // 全ての通知を取得してフィルタリング
-        // アラーム通知: "alarm_\(taskId)"
-        // リマインド通知: "reminder_\(taskId)_\(timestamp)"
-        // タスクIDで始まるプレフィックスでフィルタリングすることで、他のタスクの通知を誤ってキャンセルしないようにする
+
         let pendingRequests = await center.pendingNotificationRequests()
-        
-        // デバッグ: このタスクIDに関連する通知を探す
-        let alarmPrefix = "alarm_\(taskId)"
-        let reminderPrefix = "reminder_\(taskId)_"
-        
+
+        // 新しい形式の通知IDプレフィックス
+        let prefixes = [
+            "starttime_once_\(taskId)",
+            "starttime_reminder_\(taskId)",
+            "deadline_once_\(taskId)",
+            "deadline_reminder_\(taskId)",
+            // 旧形式との互換性（マイグレーション期間中）
+            "alarm_\(taskId)",
+            "reminder_\(taskId)"
+        ]
+
         let taskNotificationIds = pendingRequests
             .filter { request in
-                // アラーム通知またはリマインド通知のいずれかで、かつこのタスクIDを含むもの
-                request.identifier.hasPrefix(alarmPrefix) ||
-                request.identifier.hasPrefix(reminderPrefix)
+                prefixes.contains { request.identifier.hasPrefix($0) }
             }
             .map { $0.identifier }
-        
+
         if !taskNotificationIds.isEmpty {
-            print("🗑️ タスクの通知をキャンセル: \(task.title ?? "無題") (ID: \(taskId)) - \(taskNotificationIds.count)個の通知を削除")
-            print("   - 削除する通知識別子: \(taskNotificationIds.prefix(5).joined(separator: ", "))\(taskNotificationIds.count > 5 ? "..." : "")")
-        center.removePendingNotificationRequests(withIdentifiers: taskNotificationIds)
-        } else {
-            // デバッグ: なぜ通知が見つからないのかを調査
-            print("ℹ️ キャンセルする通知がありません: \(task.title ?? "無題") (ID: \(taskId))")
-            print("   - 検索プレフィックス: alarm_\(taskId), reminder_\(taskId)_")
-            print("   - 現在の通知総数: \(pendingRequests.count)個")
-            
-            // このタスクIDに関連する通知があるか確認（部分一致でも）
-            let relatedNotifications = pendingRequests.filter { $0.identifier.contains(taskId) }
-            if !relatedNotifications.isEmpty {
-                print("   - 部分一致で見つかった通知: \(relatedNotifications.count)個")
-                for notification in relatedNotifications.prefix(3) {
-                    print("     * \(notification.identifier)")
-                }
-            } else {
-                print("   - このタスクIDに関連する通知は見つかりませんでした")
-            }
-        }
-    }
-    
-    // アラーム通知のみをキャンセル
-    func cancelAlarmNotifications(for task: Task) async {
-        guard let taskId = task.id?.uuidString else { return }
-        
-        let pendingRequests = await center.pendingNotificationRequests()
-        let alarmNotificationIds = pendingRequests
-            .filter { $0.identifier.hasPrefix("alarm_\(taskId)") }
-            .map { $0.identifier }
-        
-        if !alarmNotificationIds.isEmpty {
-            center.removePendingNotificationRequests(withIdentifiers: alarmNotificationIds)
-        }
-    }
-    
-    // リマインド通知のみをキャンセル
-    func cancelReminderNotifications(for task: Task) async {
-        guard let taskId = task.id?.uuidString else { return }
-        
-        let pendingRequests = await center.pendingNotificationRequests()
-        let reminderNotificationIds = pendingRequests
-            .filter { $0.identifier.hasPrefix("reminder_\(taskId)") }
-            .map { $0.identifier }
-        
-        if !reminderNotificationIds.isEmpty {
-            print("🗑️ リマインド通知をキャンセル: \(task.title ?? "無題") - \(reminderNotificationIds.count)個の通知を削除")
-            center.removePendingNotificationRequests(withIdentifiers: reminderNotificationIds)
+            print("🗑️ タスクの通知をキャンセル: \(task.title ?? "無題") - \(taskNotificationIds.count)個")
+            center.removePendingNotificationRequests(withIdentifiers: taskNotificationIds)
         }
     }
 
-    // 通知が配信された後、次の通知をスケジュール（終了日時がない場合）
-    func scheduleNextReminderAfterDelivery(for task: Task, deliveredAt: Date) async throws {
-        guard task.reminderEnabled else { return }
-        guard !task.isCompleted else { return }
-        
-        // 終了日時がない場合のみ、次の通知をスケジュール
-        let endTime = task.reminderEndTime ?? task.deadline ?? task.startDateTime
-        guard endTime == nil else { return }
-        
-        let reminderService = ReminderService(notificationManager: self)
-        try await reminderService.scheduleNextReminder(for: task, from: deliveredAt)
-    }
-    
-    // 重要度を通知重要度にマッピング（iOS 15+）
-    private func mapPriorityToInterruptionLevel(_ priority: Priority) -> UNNotificationInterruptionLevel {
-        switch priority {
-        case .high:
-            return .timeSensitive  // 時間に敏感な通知（Focus Modeでも表示される可能性が高い）
-        case .medium:
-            return .active  // 通常の通知
-        case .low:
-            return .passive  // 控えめな通知
+    /// 特定のタイムポイントの通知をキャンセル
+    func cancelNotifications(for task: Task, type: TimePointType) async {
+        guard let taskId = task.id?.uuidString else { return }
+
+        let pendingRequests = await center.pendingNotificationRequests()
+        let prefix = "\(type.rawValue)_"
+
+        let notificationIds = pendingRequests
+            .filter { $0.identifier.hasPrefix(prefix) && $0.identifier.contains(taskId) }
+            .map { $0.identifier }
+
+        if !notificationIds.isEmpty {
+            print("🗑️ \(type.displayName)の通知をキャンセル: \(task.title ?? "無題") - \(notificationIds.count)個")
+            center.removePendingNotificationRequests(withIdentifiers: notificationIds)
         }
     }
-    
-    // 予定されている通知の一覧を取得（未配信）
+
+    /// 通知が配信された後、次の通知をスケジュール
+    func scheduleNextReminderAfterDelivery(for task: Task, deliveredAt: Date, type: TimePointType) async throws {
+        guard !task.isCompleted else { return }
+
+        let reminderService = ReminderService(notificationManager: self)
+        try await reminderService.scheduleNextReminder(for: task, from: deliveredAt, type: type)
+    }
+
+    // MARK: - Helper Methods
+
+    /// 重要度を通知重要度にマッピング
+    private func mapPriorityToInterruptionLevel(_ task: Task) -> UNNotificationInterruptionLevel {
+        if let priorityString = task.priority,
+           let priority = Priority(rawValue: priorityString) {
+            switch priority {
+            case .high:
+                return .timeSensitive
+            case .medium:
+                return .active
+            case .low:
+                return .passive
+            }
+        }
+        return .active
+    }
+
+    /// 通知タイトルに日時情報を追加
+    private func formatNotificationTitle(_ baseTitle: String, for task: Task) -> String {
+        let targetDate = task.startDateTime ?? task.deadline
+
+        guard let targetDate = targetDate else {
+            return baseTitle
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.dateFormat = "M/d HH:mm"
+        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        let dateString = formatter.string(from: targetDate)
+
+        return "\(baseTitle) (\(dateString))"
+    }
+
+    // MARK: - Query Methods
+
+    /// 予定されている通知の一覧を取得
     func getPendingNotifications() async -> [UNNotificationRequest] {
         return await center.pendingNotificationRequests()
     }
 
-    // 配信済みの通知の一覧を取得（Notification Centerに表示中）
+    /// 配信済みの通知の一覧を取得
     func getDeliveredNotifications() async -> [UNNotification] {
         return await center.deliveredNotifications()
     }
 
-    // 通知の詳細情報を取得（デバッグ用）
+    /// 通知の詳細情報を取得（デバッグ用）
     func getNotificationDetails() async -> NotificationDetails {
         let pendingRequests = await center.pendingNotificationRequests()
         let settings = await center.notificationSettings()
-        
-        print("📋 通知予定取得: 総数 \(pendingRequests.count)")
-        
+
         // 通知を種類別に分類
-        let alarms = pendingRequests.filter { $0.identifier.hasPrefix("alarm_") }
-        let reminders = pendingRequests.filter { $0.identifier.hasPrefix("reminder_") }
-        
-        print("  - アラーム通知: \(alarms.count)個")
-        print("  - リマインド通知: \(reminders.count)個")
-        
-        // アラーム通知の識別子をログ出力
-        for alarm in alarms {
-            print("  - アラーム識別子: \(alarm.identifier)")
-            print("    - タイトル: \(alarm.content.title)")
-            if let trigger = alarm.trigger as? UNCalendarNotificationTrigger,
-               let date = Calendar.current.date(from: trigger.dateComponents) {
-                print("    - 予定時刻: \(date)")
-            }
-        }
-        
-        // 通知の時刻を抽出してソート
-        let alarmDates = alarms.compactMap { request -> Date? in
+        let startTimeOnce = pendingRequests.filter { $0.identifier.hasPrefix("starttime_once_") }
+        let startTimeReminders = pendingRequests.filter { $0.identifier.hasPrefix("starttime_reminder_") }
+        let deadlineOnce = pendingRequests.filter { $0.identifier.hasPrefix("deadline_once_") }
+        let deadlineReminders = pendingRequests.filter { $0.identifier.hasPrefix("deadline_reminder_") }
+
+        print("📋 通知予定取得: 総数 \(pendingRequests.count)")
+        print("  - 開始時刻通知（1回）: \(startTimeOnce.count)個")
+        print("  - 開始時刻リマインド: \(startTimeReminders.count)個")
+        print("  - 期限通知（1回）: \(deadlineOnce.count)個")
+        print("  - 期限リマインド: \(deadlineReminders.count)個")
+
+        // 通知の時刻を抽出
+        let allDates = pendingRequests.compactMap { request -> Date? in
             if let trigger = request.trigger as? UNCalendarNotificationTrigger {
                 return Calendar.current.date(from: trigger.dateComponents)
             }
             return nil
         }.sorted()
-        
-        let reminderDates = reminders.compactMap { request -> Date? in
-            if let trigger = request.trigger as? UNCalendarNotificationTrigger {
-                return Calendar.current.date(from: trigger.dateComponents)
-            }
-            return nil
-        }.sorted()
-        
+
         return NotificationDetails(
             totalCount: pendingRequests.count,
-            alarmCount: alarms.count,
-            reminderCount: reminders.count,
+            alarmCount: startTimeOnce.count + deadlineOnce.count,
+            reminderCount: startTimeReminders.count + deadlineReminders.count,
             authorizationStatus: settings.authorizationStatus,
             alertSetting: settings.alertSetting,
             alertStyle: settings.alertStyle,
@@ -356,8 +349,8 @@ class NotificationManager {
             badgeSetting: settings.badgeSetting,
             lockScreenSetting: settings.lockScreenSetting,
             notificationCenterSetting: settings.notificationCenterSetting,
-            alarmDates: alarmDates,
-            reminderDates: reminderDates,
+            alarmDates: [],
+            reminderDates: allDates,
             allNotifications: pendingRequests.map { request in
                 NotificationInfo(
                     identifier: request.identifier,
@@ -371,32 +364,6 @@ class NotificationManager {
                 )
             }
         )
-    }
-
-    // MARK: - Helper Methods
-
-    /// 通知タイトルに日時情報を追加
-    /// - Parameters:
-    ///   - baseTitle: 基本タイトル（タスク名）
-    ///   - task: タスクオブジェクト
-    /// - Returns: 日時付きタイトル（日時がない場合はそのまま）
-    private func formatNotificationTitle(_ baseTitle: String, for task: Task) -> String {
-        // 日時を取得（開始時刻 > 期限の優先順位）
-        let targetDate = task.startDateTime ?? task.deadline
-
-        guard let targetDate = targetDate else {
-            return baseTitle
-        }
-
-        // 日時フォーマット: M/d HH:mm
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.dateFormat = "M/d HH:mm"
-        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        let dateString = formatter.string(from: targetDate)
-
-        // タスク名の後ろに日時を追加
-        return "\(baseTitle) (\(dateString))"
     }
 }
 
@@ -425,4 +392,3 @@ struct NotificationInfo {
     let categoryIdentifier: String
     let interruptionLevel: UNNotificationInterruptionLevel
 }
-

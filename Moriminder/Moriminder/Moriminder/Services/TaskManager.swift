@@ -86,31 +86,16 @@ class TaskManager {
             print("警告: 通知権限が許可されていません。ステータス: \(authorizationStatus.rawValue)")
             // 権限がない場合でもタスクの保存は続行
         }
-        
-        if task.alarmEnabled {
+
+        // 通知をスケジュール（新しいモデル: 時間ポイント別）
+        if task.hasAnyNotification {
             do {
-                try await notificationManager.scheduleAlarm(for: task)
-                print("アラームスケジュール成功: \(task.title ?? "無題")")
+                try await notificationManager.scheduleNotifications(for: task)
+                print("通知スケジュール成功: \(task.title ?? "無題")")
             } catch {
-                print("アラームスケジュールエラー: \(error)")
+                print("通知スケジュールエラー: \(error)")
                 // 通知エラーは保存を妨げないが、ログに記録
             }
-        } else if isEditing && !task.alarmEnabled {
-            // 編集時にアラームが無効化された場合、既存のアラーム通知をキャンセル
-            await notificationManager.cancelAlarmNotifications(for: task)
-        }
-        
-        if task.reminderEnabled {
-            do {
-                try await notificationManager.scheduleReminder(for: task)
-                print("リマインドスケジュール成功: \(task.title ?? "無題")")
-            } catch {
-                print("リマインドスケジュールエラー: \(error)")
-                // 通知エラーは保存を妨げないが、ログに記録
-            }
-        } else if isEditing && !task.reminderEnabled {
-            // 編集時にリマインドが無効化された場合、既存のリマインド通知をキャンセル
-            await notificationManager.cancelReminderNotifications(for: task)
         }
         
         // 4. 繰り返しタスクの場合の処理
@@ -242,9 +227,10 @@ class TaskManager {
                 return date1 > date2
             }
         case .alarmDateTime:
+            // 通知予定時刻でソート（開始時刻または期限の早い方）
             tasks.sort { task1, task2 in
-                let date1 = task1.alarmDateTime ?? Date.distantFuture
-                let date2 = task2.alarmDateTime ?? Date.distantFuture
+                let date1 = task1.startDateTime ?? task1.deadline ?? Date.distantFuture
+                let date2 = task2.startDateTime ?? task2.deadline ?? Date.distantFuture
                 return date1 < date2
             }
         case .category:

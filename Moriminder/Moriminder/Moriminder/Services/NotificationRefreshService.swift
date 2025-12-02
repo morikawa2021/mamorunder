@@ -73,8 +73,6 @@ class NotificationRefreshService {
         var totalAdded = 0
 
         for task in activeTasks {
-            guard task.reminderEnabled else { continue }
-
             // このタスクの現在の通知数を確認
             let taskNotifications = pendingRequests.filter { request in
                 request.identifier.contains(task.id?.uuidString ?? "")
@@ -87,17 +85,39 @@ class NotificationRefreshService {
                 let needed = targetCount - currentTaskCount
                 print("📝 \(task.title ?? "無題"): 現在\(currentTaskCount)個 → \(needed)個追加")
 
-                // 最後の通知時刻を取得
-                let lastNotificationTime = taskNotifications
-                    .compactMap { request -> Date? in
-                        guard let trigger = request.trigger as? UNCalendarNotificationTrigger else { return nil }
-                        return Calendar.current.date(from: trigger.dateComponents)
+                // 開始時刻のリマインドを補充
+                if task.hasStartTimeReminder {
+                    let startTimeNotifications = taskNotifications.filter {
+                        $0.identifier.hasPrefix("starttime_reminder_")
                     }
-                    .max()
+                    if startTimeNotifications.count < targetCount {
+                        let lastTime = getLastNotificationTime(from: startTimeNotifications)
+                        try await addNotifications(
+                            for: task,
+                            type: .startTime,
+                            count: targetCount - startTimeNotifications.count,
+                            after: lastTime
+                        )
+                        totalAdded += targetCount - startTimeNotifications.count
+                    }
+                }
 
-                // 追加の通知をスケジュール
-                try await addNotifications(for: task, count: needed, after: lastNotificationTime)
-                totalAdded += needed
+                // 期限のリマインドを補充
+                if task.hasDeadlineReminder {
+                    let deadlineNotifications = taskNotifications.filter {
+                        $0.identifier.hasPrefix("deadline_reminder_")
+                    }
+                    if deadlineNotifications.count < targetCount {
+                        let lastTime = getLastNotificationTime(from: deadlineNotifications)
+                        try await addNotifications(
+                            for: task,
+                            type: .deadline,
+                            count: targetCount - deadlineNotifications.count,
+                            after: lastTime
+                        )
+                        totalAdded += targetCount - deadlineNotifications.count
+                    }
+                }
             }
         }
 
@@ -105,13 +125,27 @@ class NotificationRefreshService {
         print("✅ 通知リフレッシュ完了: \(currentCount)個 → \(finalCount)個（+\(totalAdded)個追加）")
     }
 
+    // 最後の通知時刻を取得
+    private func getLastNotificationTime(from notifications: [UNNotificationRequest]) -> Date? {
+        notifications
+            .compactMap { request -> Date? in
+                guard let trigger = request.trigger as? UNCalendarNotificationTrigger else { return nil }
+                return Calendar.current.date(from: trigger.dateComponents)
+            }
+            .max()
+    }
+
     // アクティブなタスクを取得（未完了・リマインド有効）
     private func fetchActiveTasks() async -> [Task] {
         let request: NSFetchRequest<Task> = Task.fetchRequest()
+        // リマインドタイプのタスクを取得
         request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
             NSPredicate(format: "isCompleted == NO"),
             NSPredicate(format: "isArchived == NO"),
-            NSPredicate(format: "reminderEnabled == YES")
+            NSCompoundPredicate(orPredicateWithSubpredicates: [
+                NSPredicate(format: "startTimeNotification == %@", NotificationType.remind.rawValue),
+                NSPredicate(format: "deadlineNotification == %@", NotificationType.remind.rawValue)
+            ])
         ])
 
         // 重要度順にソート（高→中→低）
@@ -131,9 +165,23 @@ class NotificationRefreshService {
     }
 
     // 指定されたタスクに追加の通知をスケジュール
-    private func addNotifications(for task: Task, count: Int, after lastTime: Date?) async throws {
-        let intervalMinutes = Int(task.reminderInterval)
-        let endTime = task.reminderEndTime
+    private func addNotifications(for task: Task, type: TimePointType, count: Int, after lastTime: Date?) async throws {
+        let intervalMinutes: Int
+        let targetDate: Date?
+        let endTime: Date?
+
+        switch type {
+        case .startTime:
+            intervalMinutes = Int(task.startTimeReminderInterval)
+            targetDate = task.startDateTime
+            endTime = task.startTimeReminderEndDate()
+        case .deadline:
+            intervalMinutes = Int(task.deadlineReminderInterval)
+            targetDate = task.deadline
+            endTime = task.deadlineReminderEndDate()
+        }
+
+        guard let targetDate = targetDate else { return }
 
         // 開始時刻を決定
         var currentTime: Date
@@ -141,12 +189,12 @@ class NotificationRefreshService {
             // 最後の通知時刻から間隔分後
             currentTime = lastTime.addingTimeInterval(TimeInterval(intervalMinutes * 60))
         } else {
-            // reminderStartTimeまたはデフォルト
-            if let startTime = task.reminderStartTime {
-                currentTime = startTime
-            } else {
-                let targetTime = task.deadline ?? task.startDateTime ?? Date()
-                currentTime = targetTime.addingTimeInterval(-3600) // 1時間前
+            // リマインド開始時刻から
+            switch type {
+            case .startTime:
+                currentTime = task.startTimeReminderStartDate() ?? targetDate.addingTimeInterval(-3600)
+            case .deadline:
+                currentTime = task.deadlineReminderStartDate() ?? targetDate.addingTimeInterval(-3600)
             }
         }
 
@@ -160,9 +208,12 @@ class NotificationRefreshService {
 
             // 現在時刻より未来の時刻のみスケジュール
             if currentTime > Date() {
+                let isFinal = currentTime >= targetDate
                 try await notificationManager.scheduleReminderNotification(
                     for: task,
-                    at: currentTime
+                    at: currentTime,
+                    type: type,
+                    isFinal: isFinal
                 )
                 added += 1
             }

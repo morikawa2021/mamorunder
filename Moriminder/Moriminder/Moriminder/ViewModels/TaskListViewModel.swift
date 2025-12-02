@@ -113,8 +113,9 @@ class TaskListViewModel: ObservableObject {
         guard let task = taskToStopReminder else { return }
         taskToStopReminder = nil
 
-        // リマインドを無効化
-        task.reminderEnabled = false
+        // すべての通知を無効化
+        task.startTimeNotificationType = .none
+        task.deadlineNotificationType = .none
 
         _Concurrency.Task {
             // 通知をキャンセル

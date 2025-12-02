@@ -317,15 +317,9 @@ struct NotificationDebugView: View {
                     // 既存の通知を削除
                     await notificationManager.cancelNotifications(for: task)
 
-                    // アラームを再スケジュール
-                    if task.alarmEnabled {
-                        try? await notificationManager.scheduleAlarm(for: task)
-                    }
-
-                    // リマインダーを再スケジュール
-                    if task.reminderEnabled {
-                        let reminderService = ReminderService(notificationManager: notificationManager)
-                        try? await reminderService.scheduleReminder(for: task)
+                    // 通知を再スケジュール（新モデル）
+                    if task.hasAnyNotification {
+                        try? await notificationManager.scheduleNotifications(for: task)
                     }
                 }
 

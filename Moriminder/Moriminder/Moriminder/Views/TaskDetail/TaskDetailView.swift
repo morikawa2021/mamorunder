@@ -105,29 +105,39 @@ struct TaskDetailView: View {
                         VStack(alignment: .leading, spacing: 16) {
                             SectionHeader(title: "通知設定", icon: "bell.fill")
 
-                            // アラーム
-                            DetailRow(
-                                label: "アラーム",
-                                value: viewModel.formattedAlarm,
-                                icon: "alarm.fill"
-                            )
+                            // 開始時刻の通知
+                            if viewModel.task.startDateTime != nil {
+                                DetailRow(
+                                    label: "開始時刻",
+                                    value: viewModel.formattedStartTimeNotification,
+                                    icon: "clock.fill"
+                                )
+                            }
 
-                            // リマインダー
-                            VStack(alignment: .leading, spacing: 8) {
+                            // 期限の通知
+                            if viewModel.task.deadline != nil {
+                                DetailRow(
+                                    label: "期限",
+                                    value: viewModel.formattedDeadlineNotification,
+                                    icon: "alarm.fill"
+                                )
+                            }
+
+                            // どちらも設定されていない場合
+                            if viewModel.task.startDateTime == nil && viewModel.task.deadline == nil {
                                 HStack {
-                                    Label("リマインダー", systemImage: "repeat")
+                                    Label("通知", systemImage: "bell.slash")
                                         .font(.subheadline)
                                         .foregroundColor(.secondary)
 
                                     Spacer()
-                                }
 
-                                Text(viewModel.formattedReminder)
-                                    .font(.body)
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
-                                    .multilineTextAlignment(.trailing)
+                                    Text("日時が設定されていません")
+                                        .font(.body)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal)
                             }
-                            .padding(.horizontal)
                         }
                         .padding()
                         .background(Color(.systemBackground))
@@ -300,11 +310,12 @@ struct DetailRow: View {
     task.title = "サンプルタスク"
     task.priority = Priority.high.rawValue
     task.taskType = TaskType.task.rawValue
-    task.deadline = Date()
-    task.alarmEnabled = true
-    task.alarmDateTime = Date()
-    task.reminderEnabled = true
-    task.reminderInterval = 60
+    task.deadline = Date().addingTimeInterval(3600)
+    task.startDateTime = Date()
+    task.startTimeNotification = NotificationType.remind.rawValue
+    task.startTimeReminderOffset = 30
+    task.startTimeReminderInterval = 10
+    task.deadlineNotification = NotificationType.once.rawValue
     task.isRepeating = false
 
     return TaskDetailView(task: task)

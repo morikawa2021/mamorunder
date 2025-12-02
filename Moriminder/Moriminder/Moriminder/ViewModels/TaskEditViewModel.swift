@@ -15,50 +15,58 @@ class TaskEditViewModel: ObservableObject {
         case create
         case edit(Task)
     }
-    
+
+    // MARK: - Basic Properties
     @Published var title: String = ""
     @Published var category: Category?
     @Published var priority: Priority = .medium
     @Published var taskType: TaskType = .task
     @Published var deadline: Date?
     @Published var startDateTime: Date?
-    @Published var alarmEnabled: Bool = false
-    @Published var alarmDateTime: Date?
-    @Published var alarmSound: String?
-    @Published var reminderEnabled: Bool = false
-    @Published var reminderInterval: Int = 60
-    @Published var reminderStartTime: Date?
-    @Published var reminderEndTime: Date?
+
+    // MARK: - Notification Properties (New Model)
+    // 開始時刻の通知設定
+    @Published var startTimeNotification: NotificationType = .none
+    @Published var startTimeReminderOffset: Int = 30  // 分
+    @Published var startTimeReminderInterval: Int = 10  // 分
+
+    // 期限の通知設定
+    @Published var deadlineNotification: NotificationType = .none
+    @Published var deadlineReminderOffset: Int = 60  // 分
+    @Published var deadlineReminderInterval: Int = 15  // 分
+
+    // MARK: - Repeat Properties
     @Published var isRepeating: Bool = false
     @Published var repeatPattern: RepeatPattern?
     @Published var repeatEndDate: Date?
-    
+
+    // MARK: - UI State
     @Published var categories: [Category] = []
     @Published var presetTimes: [PresetTime] = []
     @Published var isSaving: Bool = false
-    
+
     var isValid: Bool {
         !title.isEmpty && !isSaving
     }
-    
+
     private let mode: Mode
     private var taskManager: TaskManager
     private var viewContext: NSManagedObjectContext
-    
+
     init(mode: Mode, viewContext: NSManagedObjectContext = PersistenceController.shared.container.viewContext) {
         self.mode = mode
         self.viewContext = viewContext
         self.taskManager = TaskManager(viewContext: viewContext)
-        
+
         // 編集モードの場合、既存のタスクデータを読み込む
         if case .edit(let task) = mode {
             loadTask(task)
         }
-        
+
         loadCategories()
         loadPresetTimes()
     }
-    
+
     func updateViewContext(_ newViewContext: NSManagedObjectContext) {
         self.viewContext = newViewContext
         self.taskManager = TaskManager(viewContext: newViewContext)
@@ -66,7 +74,7 @@ class TaskEditViewModel: ObservableObject {
         loadCategories()
         loadPresetTimes()
     }
-    
+
     private func loadTask(_ task: Task) {
         title = task.title ?? ""
         category = task.category
@@ -78,25 +86,29 @@ class TaskEditViewModel: ObservableObject {
         }
         deadline = task.deadline
         startDateTime = task.startDateTime
-        alarmEnabled = task.alarmEnabled
-        alarmDateTime = task.alarmDateTime
-        alarmSound = task.alarmSound
-        reminderEnabled = task.reminderEnabled
-        reminderInterval = Int(task.reminderInterval)
-        reminderStartTime = task.reminderStartTime
-        reminderEndTime = task.reminderEndTime
+
+        // 通知設定（新モデル）
+        startTimeNotification = task.startTimeNotificationType
+        startTimeReminderOffset = Int(task.startTimeReminderOffset)
+        startTimeReminderInterval = Int(task.startTimeReminderInterval)
+
+        deadlineNotification = task.deadlineNotificationType
+        deadlineReminderOffset = Int(task.deadlineReminderOffset)
+        deadlineReminderInterval = Int(task.deadlineReminderInterval)
+
+        // 繰り返し設定
         isRepeating = task.isRepeating
         repeatPattern = task.repeatPattern
         repeatEndDate = task.repeatEndDate
     }
-    
+
     func loadCategories() {
         let request: NSFetchRequest<Category> = Category.fetchRequest()
         request.sortDescriptors = [
             NSSortDescriptor(key: "usageCount", ascending: false),
             NSSortDescriptor(key: "createdAt", ascending: false)
         ]
-        
+
         do {
             categories = try viewContext.fetch(request)
         } catch {
@@ -104,14 +116,14 @@ class TaskEditViewModel: ObservableObject {
             categories = []
         }
     }
-    
+
     private func loadPresetTimes() {
         let request: NSFetchRequest<PresetTime> = PresetTime.fetchRequest()
         request.sortDescriptors = [
             NSSortDescriptor(key: "isDefault", ascending: false),
             NSSortDescriptor(key: "order", ascending: true)
         ]
-        
+
         do {
             presetTimes = try viewContext.fetch(request)
         } catch {
@@ -119,21 +131,21 @@ class TaskEditViewModel: ObservableObject {
             presetTimes = []
         }
     }
-    
+
     func save() async throws {
         // 保存中のフラグを設定
         await MainActor.run {
             isSaving = true
         }
-        
+
         defer {
             _Concurrency.Task { @MainActor in
                 isSaving = false
             }
         }
-        
+
         let task: Task
-        
+
         switch mode {
         case .create:
             // 新規作成
@@ -157,7 +169,7 @@ class TaskEditViewModel: ObservableObject {
                 task = existingTask
             }
         }
-        
+
         // 基本情報の設定
         task.title = title
         task.category = category
@@ -165,49 +177,43 @@ class TaskEditViewModel: ObservableObject {
         task.taskType = taskType.rawValue
         task.deadline = deadline
         task.startDateTime = startDateTime
-        
-        // アラーム設定
-        task.alarmEnabled = alarmEnabled
-        // alarmEnabledがtrueでalarmDateTimeがnilの場合、defaultDateTime（deadlineまたはstartDateTime）を設定
-        if alarmEnabled && alarmDateTime == nil {
-            let defaultDateTime = taskType == .task ? deadline : startDateTime
-            if let defaultDateTime = defaultDateTime {
-                task.alarmDateTime = defaultDateTime
-                print("⚠️ アラームが有効ですがalarmDateTimeがnilのため、defaultDateTimeを設定しました: \(defaultDateTime)")
-            } else {
-                // defaultDateTimeもnilの場合は現在時刻を設定
-                task.alarmDateTime = Date()
-                print("⚠️ アラームが有効ですがalarmDateTimeとdefaultDateTimeがnilのため、現在時刻を設定しました")
-            }
+
+        // 通知設定（新モデル）
+        // 開始時刻がない場合は通知設定を無効化
+        if startDateTime != nil {
+            task.startTimeNotificationType = startTimeNotification
+            task.startTimeReminderOffset = Int32(startTimeReminderOffset)
+            task.startTimeReminderInterval = Int32(startTimeReminderInterval)
         } else {
-            task.alarmDateTime = alarmDateTime
+            task.startTimeNotificationType = .none
         }
-        task.alarmSound = alarmSound
-        
+
+        // 期限がない場合は通知設定を無効化
+        if deadline != nil {
+            task.deadlineNotificationType = deadlineNotification
+            task.deadlineReminderOffset = Int32(deadlineReminderOffset)
+            task.deadlineReminderInterval = Int32(deadlineReminderInterval)
+        } else {
+            task.deadlineNotificationType = .none
+        }
+
         print("💾 タスク保存: \(title)")
-        print("  - alarmEnabled: \(alarmEnabled)")
-        print("  - alarmDateTime: \(alarmDateTime?.description ?? "nil")")
-        print("  - task.alarmEnabled: \(task.alarmEnabled)")
-        print("  - task.alarmDateTime: \(task.alarmDateTime?.description ?? "nil")")
-        
-        // リマインド設定
-        task.reminderEnabled = reminderEnabled
-        task.reminderInterval = Int32(reminderInterval)
-        task.reminderStartTime = reminderStartTime
-        task.reminderEndTime = reminderEndTime
+        print("  - startDateTime: \(startDateTime?.description ?? "nil")")
+        print("  - startTimeNotification: \(startTimeNotification.rawValue)")
+        print("  - deadline: \(deadline?.description ?? "nil")")
+        print("  - deadlineNotification: \(deadlineNotification.rawValue)")
 
         // 繰り返し設定
         task.isRepeating = isRepeating
         task.repeatPattern = repeatPattern
         task.repeatEndDate = repeatEndDate
-        
+
         // カテゴリの使用回数をインクリメント
         if let category = category {
             category.usageCount += 1
         }
-        
+
         // 保存と通知スケジュール
         try await taskManager.createTask(task)
     }
 }
-

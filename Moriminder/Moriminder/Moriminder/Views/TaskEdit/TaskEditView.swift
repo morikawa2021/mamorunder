@@ -142,46 +142,26 @@ struct TaskEditView: View {
                     }
                 }
                 
-                // アラーム設定（任意）
-                Section {
-                    Group {
-                        AlarmSettingView(
-                            enabled: $viewModel.alarmEnabled,
-                            dateTime: $viewModel.alarmDateTime,
-                            sound: $viewModel.alarmSound,
-                            defaultDateTime: viewModel.taskType == .task ? viewModel.deadline : viewModel.startDateTime
-                        )
-                    }
-                    .listRowBackground(Color(.systemBackground))
-                } header: {
-                    HStack(spacing: 4) {
-                        Text("アラーム設定")
-                        Text("（任意）")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                // 開始時刻の通知設定（開始時刻が設定されている場合のみ表示）
+                if let startDateTime = viewModel.startDateTime {
+                    TimePointNotificationView(
+                        kind: .startTime,
+                        targetDate: startDateTime,
+                        notificationType: $viewModel.startTimeNotification,
+                        reminderOffset: $viewModel.startTimeReminderOffset,
+                        reminderInterval: $viewModel.startTimeReminderInterval
+                    )
                 }
-                
-                // リマインド設定（任意）
-                Section {
-                    Group {
-                        ReminderSettingView(
-                            enabled: $viewModel.reminderEnabled,
-                            startTime: $viewModel.reminderStartTime,
-                            interval: $viewModel.reminderInterval,
-                            endTime: $viewModel.reminderEndTime,
-                            deadline: viewModel.deadline,
-                            startDateTime: viewModel.startDateTime
-                        )
-                    }
-                    .listRowBackground(Color(.systemBackground))
-                } header: {
-                    HStack(spacing: 4) {
-                        Text("リマインド設定")
-                        Text("（任意）")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+
+                // 期限の通知設定（期限が設定されている場合のみ表示）
+                if let deadline = viewModel.deadline {
+                    TimePointNotificationView(
+                        kind: .deadline,
+                        targetDate: deadline,
+                        notificationType: $viewModel.deadlineNotification,
+                        reminderOffset: $viewModel.deadlineReminderOffset,
+                        reminderInterval: $viewModel.deadlineReminderInterval
+                    )
                 }
                 
                 // 繰り返し設定（任意）

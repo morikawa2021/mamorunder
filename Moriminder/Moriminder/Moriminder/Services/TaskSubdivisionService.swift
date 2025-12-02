@@ -38,10 +38,10 @@ class TaskSubdivisionService {
     func isEligibleForSubdivision(_ task: Task) -> Bool {
         guard !task.isCompleted,
               let createdAt = task.createdAt,
-              task.reminderEnabled else {
+              task.hasAnyNotification else {
             return false
         }
-        
+
         let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
         return createdAt <= sevenDaysAgo
     }

@@ -102,12 +102,10 @@ struct TaskCardView: View {
                 .foregroundColor(.primary)
             }
             
-            // リマインド設定
-            if task.reminderEnabled {
+            // 通知設定の表示
+            if task.hasAnyNotification {
                 Label {
-                    let offsetMinutes = task.reminderStartOffsetMinutes() ?? 60
-                    let intervalMinutes = Int(task.reminderInterval)
-                    Text("リマインド: \(offsetMinutes)分前・\(intervalMinutes)分間隔")
+                    notificationSummaryText
                 } icon: {
                     Image(systemName: "bell")
                 }
@@ -147,6 +145,59 @@ struct TaskCardView: View {
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy年M月d日(E) H:mm"
         return formatter.string(from: date)
+    }
+
+    /// 通知設定のサマリテキスト
+    private var notificationSummaryText: Text {
+        var parts: [String] = []
+
+        if task.hasStartTimeNotification {
+            switch task.startTimeNotificationType {
+            case .once:
+                parts.append("開始時刻に通知")
+            case .remind:
+                let offset = formatOffset(Int(task.startTimeReminderOffset))
+                let interval = formatInterval(Int(task.startTimeReminderInterval))
+                parts.append("開始: \(offset)前・\(interval)間隔")
+            case .none:
+                break
+            }
+        }
+
+        if task.hasDeadlineNotification {
+            switch task.deadlineNotificationType {
+            case .once:
+                parts.append("期限に通知")
+            case .remind:
+                let offset = formatOffset(Int(task.deadlineReminderOffset))
+                let interval = formatInterval(Int(task.deadlineReminderInterval))
+                parts.append("期限: \(offset)前・\(interval)間隔")
+            case .none:
+                break
+            }
+        }
+
+        return Text(parts.joined(separator: " / "))
+    }
+
+    private func formatOffset(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes)分"
+        } else if minutes < 1440 {
+            return "\(minutes / 60)時間"
+        } else {
+            return "\(minutes / 1440)日"
+        }
+    }
+
+    private func formatInterval(_ minutes: Int) -> String {
+        if minutes < 60 {
+            return "\(minutes)分"
+        } else if minutes < 1440 {
+            return "\(minutes / 60)時間"
+        } else {
+            return "\(minutes / 1440)日"
+        }
     }
 }
 

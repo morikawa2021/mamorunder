@@ -172,19 +172,16 @@ class RepeatingTaskGenerator {
             task.deadline = nextDate
         }
         
-        // アラーム設定
-        task.alarmEnabled = parentTask.alarmEnabled
-        if let originalAlarm = parentTask.alarmDateTime,
-           let originalDate = parentTask.deadline ?? parentTask.startDateTime {
-            task.alarmDateTime = addIntervalToAlarm(originalAlarm, nextDate: nextDate, originalDate: originalDate)
-        }
-        task.alarmSound = parentTask.alarmSound
-        
-        // リマインド設定
-        task.reminderEnabled = parentTask.reminderEnabled
-        task.reminderInterval = parentTask.reminderInterval
-        task.reminderStartTime = parentTask.reminderStartTime
-        task.reminderEndTime = parentTask.reminderEndTime
+        // 通知設定（新モデル）
+        // 開始時刻の通知設定
+        task.startTimeNotification = parentTask.startTimeNotification
+        task.startTimeReminderOffset = parentTask.startTimeReminderOffset
+        task.startTimeReminderInterval = parentTask.startTimeReminderInterval
+
+        // 期限の通知設定
+        task.deadlineNotification = parentTask.deadlineNotification
+        task.deadlineReminderOffset = parentTask.deadlineReminderOffset
+        task.deadlineReminderInterval = parentTask.deadlineReminderInterval
 
         // 繰り返し設定
         task.isRepeating = true
