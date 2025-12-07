@@ -44,6 +44,7 @@ struct TimePointNotificationView: View {
 
     // リマインドオフセットの選択肢
     private let offsetOptions = [
+        (0, "0分前"),
         (5, "5分前"),
         (10, "10分前"),
         (15, "15分前"),
